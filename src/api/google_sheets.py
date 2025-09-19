@@ -5,6 +5,7 @@ Google Sheets API integration for real-time form data fetching.
 import os
 import time
 import logging
+import random
 from typing import Optional, List, Dict, Any
 import pandas as pd
 from google.oauth2 import service_account
