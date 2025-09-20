@@ -21,6 +21,8 @@ from src.processing.data_processor import DataProcessor, CacheManager
 from src.processing.feature_engineer import FeatureEngineer
 from src.models.clustering import MusicClusterer
 from src.models.classifier import MajorPredictor
+from src.models.group_formation import GroupFormationEngine
+from src.utils.group_namer import GroupNamer
 from src.visualization.live_charts import LiveVisualizer
 
 # Page configuration
@@ -68,6 +70,12 @@ if 'game_score' not in st.session_state:
     st.session_state.game_score = 0
 if 'game_round' not in st.session_state:
     st.session_state.game_round = 0
+if 'current_groups' not in st.session_state:
+    st.session_state.current_groups = []
+if 'groups_finalized' not in st.session_state:
+    st.session_state.groups_finalized = False
+if 'group_change_requests' not in st.session_state:
+    st.session_state.group_change_requests = []
 
 # Initialize clients and processors
 @st.cache_resource
@@ -97,11 +105,13 @@ def init_components():
     clusterer = MusicClusterer()
     predictor = MajorPredictor()
     visualizer = LiveVisualizer()
+    group_engine = GroupFormationEngine()
+    group_namer = GroupNamer()
 
-    return sheets_client, processor, engineer, clusterer, predictor, visualizer
+    return sheets_client, processor, engineer, clusterer, predictor, visualizer, group_engine, group_namer
 
 # Load components
-sheets_client, processor, engineer, clusterer, predictor, visualizer = init_components()
+sheets_client, processor, engineer, clusterer, predictor, visualizer, group_engine, group_namer = init_components()
 
 # Sidebar
 with st.sidebar:
@@ -183,7 +193,7 @@ if not df.empty:
 
 # Create tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
-    "🎯 Live Feed", "👥 Music Twin Finder", "📊 Analysis",
+    "🎯 Live Feed", "🎵 Group Finder", "📊 Analysis",
     "🎮 Major Guesser", "🏆 Leaderboard"
 ])
 
@@ -218,35 +228,146 @@ with tab1:
         st.info("Waiting for responses... The feed will update automatically!")
 
 with tab2:
-    st.header("👥 Discover Your Music Twin")
+    st.header("🎵 Group Finder")
 
-    if not df.empty and 'name' in df.columns:
-        selected_user = st.selectbox("Select your entry:", df['name'].unique())
+    if not df.empty and len(df) >= 6:
+        # Group formation controls
+        col1, col2 = st.columns([3, 1])
 
-        if selected_user and st.button("🔍 Find My Music Twin!", type="primary"):
-            user_idx = df[df['name'] == selected_user].index[0]
+        with col1:
+            st.subheader("Form Music Groups")
+            if not st.session_state.groups_finalized:
+                if st.button("🎲 Create Groups", type="primary", disabled=len(st.session_state.current_groups) > 0):
+                    # Create groups using the group formation engine
+                    try:
+                        groups = group_engine.create_groups(df)
+                        groups_with_names = group_namer.generate_group_names(groups)
+                        st.session_state.current_groups = groups_with_names
+                        st.success(f"Created {len(groups_with_names)} groups!")
+                        st.rerun()
+                    except Exception as e:
+                        st.error(f"Error creating groups: {e}")
 
-            # Get similarity matrix from first row (it's the same for all)
-            if 'similarity_matrix' in df.columns:
-                similarity_matrix = df.iloc[0]['similarity_matrix']
-                twins = engineer.find_music_twins(user_idx, similarity_matrix, top_k=3)
+                if len(st.session_state.current_groups) > 0:
+                    if st.button("🔄 Regenerate Groups", type="secondary"):
+                        st.session_state.current_groups = []
+                        st.rerun()
+            else:
+                st.success("Groups have been finalized! ✅")
 
-                st.subheader("Your Music Twins:")
-                for twin_idx, similarity in twins:
-                    twin = df.iloc[twin_idx]
-                    match_percent = similarity * 100
+        with col2:
+            if len(st.session_state.current_groups) > 0 and not st.session_state.groups_finalized:
+                if st.button("🔒 Finalize Groups", type="primary"):
+                    st.session_state.groups_finalized = True
+                    st.balloons()
+                    st.success("Groups finalized!")
+                    st.rerun()
 
+        # Display current groups
+        if len(st.session_state.current_groups) > 0:
+            st.divider()
+            st.subheader("Your Music Groups")
+
+            for i, group in enumerate(st.session_state.current_groups):
+                with st.container():
+                    # Group header with roast name
                     col1, col2 = st.columns([3, 1])
                     with col1:
-                        st.write(f"**{twin.get('name', 'Anonymous')}** - {match_percent:.1f}% match")
-                        st.write(f"🎵 {twin.get('favorite_song', 'Unknown')} by {twin.get('artist', 'Unknown')}")
-                        st.write(f"📚 Major: {twin.get('major', 'Unknown')}")
+                        st.markdown(f"### 🎤 {group.roast_name}")
+                        st.caption(group.group_theme)
                     with col2:
-                        st.metric("Match", f"{match_percent:.0f}%")
-            else:
-                st.warning("Processing data... Please try again in a moment.")
+                        st.metric("Compatibility", f"{group.compatibility_score:.1f}%")
+
+                    # Group members
+                    st.markdown("**Members:**")
+                    member_cols = st.columns(min(len(group.members), 4))
+
+                    for j, member_name in enumerate(group.members):
+                        col_idx = j % len(member_cols)
+                        with member_cols[col_idx]:
+                            # Find member data
+                            member_data = df[df['name'] == member_name]
+                            if not member_data.empty:
+                                member = member_data.iloc[0]
+                                st.write(f"**{member_name}**")
+                                st.write(f"🎵 {member.get('favorite_song', 'Unknown')}")
+                                st.write(f"👤 {member.get('artist', 'Unknown')}")
+                                st.write(f"📚 {member.get('major', 'Unknown')}")
+                            else:
+                                st.write(f"**{member_name}**")
+
+                    # Group characteristics
+                    if group.shared_artists:
+                        st.write(f"🎤 **Shared Artists:** {', '.join(group.shared_artists[:3])}")
+                    if group.shared_genres:
+                        st.write(f"🎶 **Shared Genres:** {', '.join(group.shared_genres[:3])}")
+
+                    # Request to join group (if groups not finalized)
+                    if not st.session_state.groups_finalized and 'name' in df.columns:
+                        with st.expander("Request to Join This Group"):
+                            available_names = [name for name in df['name'].unique()
+                                             if name not in group.members]
+                            if available_names:
+                                selected_name = st.selectbox(
+                                    "Select your name:",
+                                    ["Select..."] + available_names,
+                                    key=f"join_group_{i}"
+                                )
+                                if selected_name != "Select..." and st.button(f"Request to Join", key=f"request_{i}"):
+                                    # Check if user is already in another group
+                                    current_group = group_engine.get_group_by_member(selected_name)
+                                    if current_group and len(current_group.members) <= 3:
+                                        st.warning("Your current group would become too small if you leave.")
+                                    elif len(group.members) >= 6:
+                                        st.warning("This group is already full.")
+                                    else:
+                                        # Add to requests
+                                        request = {
+                                            'member': selected_name,
+                                            'target_group': i,
+                                            'target_group_name': group.roast_name
+                                        }
+                                        st.session_state.group_change_requests.append(request)
+                                        st.success(f"Request submitted to join {group.roast_name}!")
+                            else:
+                                st.info("All members are already in this group.")
+
+                    st.divider()
+
+            # Display pending requests (if any)
+            if len(st.session_state.group_change_requests) > 0 and not st.session_state.groups_finalized:
+                st.subheader("📋 Pending Group Change Requests")
+                for i, request in enumerate(st.session_state.group_change_requests):
+                    col1, col2, col3 = st.columns([2, 2, 1])
+                    with col1:
+                        st.write(f"**{request['member']}** wants to join **{request['target_group_name']}**")
+                    with col2:
+                        if st.button("✅ Approve", key=f"approve_{i}"):
+                            # Process the request
+                            success = group_engine.request_group_change(
+                                request['member'],
+                                request['target_group']
+                            )
+                            if success:
+                                st.success("Request approved!")
+                                # Remove the request
+                                st.session_state.group_change_requests.pop(i)
+                                st.rerun()
+                            else:
+                                st.error("Could not process request - group constraints violated.")
+                    with col3:
+                        if st.button("❌ Deny", key=f"deny_{i}"):
+                            st.session_state.group_change_requests.pop(i)
+                            st.rerun()
+        else:
+            st.info("Click 'Create Groups' to form music-based groups!")
+
+    elif not df.empty and len(df) < 6:
+        st.info(f"Need at least 6 people to form groups. Currently have {len(df)} people.")
+        st.write("Groups will be created automatically when more people join!")
+
     else:
-        st.info("Add your music preferences to find your twin!")
+        st.info("Waiting for people to join... Groups will be formed automatically!")
 
 with tab3:
     st.header("📊 Group Analysis")

@@ -1,0 +1,54 @@
+@import "tailwindcss";
+
+:root {
+  /* High-end SaaS Dark Mode - Premium Color Palette */
+  --background: #0a0a0a;
+  --foreground: #fafafa;
+
+  /* Surface colors - sophisticated grays */
+  --surface-primary: #111111;
+  --surface-secondary: #171717;
+  --surface-tertiary: #1f1f1f;
+  --surface-elevated: #262626;
+
+  /* Text hierarchy */
+  --text-primary: #fafafa;
+  --text-secondary: #a1a1aa;
+  --text-tertiary: #71717a;
+  --text-muted: #52525b;
+
+  /* Border colors */
+  --border-primary: #27272a;
+  --border-secondary: #3f3f46;
+  --border-focus: #6366f1;
+
+  /* Accent colors - vibrant but sophisticated */
+  --accent-primary: #6366f1;     /* Indigo */
+  --accent-secondary: #8b5cf6;   /* Purple */
+  --accent-success: #10b981;     /* Emerald */
+  --accent-warning: #f59e0b;     /* Amber */
+  --accent-error: #ef4444;       /* Red */
+
+  /* Spotify brand colors */
+  --spotify-green: #1db954;
+  --spotify-black: #191414;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--surface-secondary);
+  --color-card-foreground: var(--text-primary);
+  --color-muted: var(--surface-tertiary);
+  --color-muted-foreground: var(--text-secondary);
+  --color-border: var(--border-primary);
+  --color-ring: var(--accent-primary);
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, 'Cascadia Code', 'Source Code Pro', monospace;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: Arial, Helvetica, sans-serif;
+}
