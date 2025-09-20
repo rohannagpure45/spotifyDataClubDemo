@@ -46,7 +46,7 @@ export default function PCA3DVisualization({ data }: PCA3DVisualizationProps) {
   }, [])
 
   useEffect(() => {
-    if (!data || !isClient) return
+    if (!data || !isClient || !data.musicDNA || !data.components) return
 
     // Extract coordinates and labels
     const xData = data.musicDNA.map(user => user.coordinates[0])
