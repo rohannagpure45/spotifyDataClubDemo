@@ -9,6 +9,8 @@ font = "sans serif"
 maxUploadSize = 10
 enableCORS = true
 enableXsrfProtection = true
+sslCertFile = "cert.pem"
+sslKeyFile = "key.pem"
 
 [browser]
 gatherUsageStats = false
