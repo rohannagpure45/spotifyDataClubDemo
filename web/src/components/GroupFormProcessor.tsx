@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Upload, Link, Users, Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
+import { Upload, Link, Users, Download, Loader2, AlertCircle } from 'lucide-react'
 
 type ProcessedMember = {
   userId?: string

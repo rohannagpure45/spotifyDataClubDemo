@@ -61,7 +61,7 @@ export default function PCA3DVisualization({ data }: PCA3DVisualizationProps) {
     )
 
     // Color mapping for different trait combinations
-    const colors = data.musicDNA.map((user, index) => {
+    const colors = data.musicDNA.map((user) => {
       const traitColors: Record<string, number> = {
         'High Energy': 0,
         'Energetic': 0,
@@ -132,7 +132,7 @@ export default function PCA3DVisualization({ data }: PCA3DVisualizationProps) {
         bordercolor: 'var(--border-primary)',
         font: { color: 'var(--text-primary)' }
       }
-    }
+    } as unknown as Data
 
     const layout = {
       title: {
@@ -216,7 +216,7 @@ export default function PCA3DVisualization({ data }: PCA3DVisualizationProps) {
           }
         }
       ]
-    }
+    } as Partial<Layout>
 
     const config = {
       displayModeBar: true,
@@ -229,7 +229,7 @@ export default function PCA3DVisualization({ data }: PCA3DVisualizationProps) {
         width: 1200,
         scale: 1
       }
-    }
+    } as Partial<Config>
 
     setPlotData({ data: [trace], layout, config })
   }, [data, isClient])

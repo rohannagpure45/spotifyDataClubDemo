@@ -80,7 +80,7 @@ export default function SignupPage() {
         }
       }, 1000)
 
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setIsLoading(false)

@@ -1,4 +1,5 @@
-import NextAuth from 'next-auth'
+// Ambient module augmentation for next-auth types
+import 'next-auth'
 
 declare module 'next-auth' {
   interface Session {

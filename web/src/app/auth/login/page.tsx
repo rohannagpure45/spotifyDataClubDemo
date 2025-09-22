@@ -35,7 +35,7 @@ export default function LoginPage() {
           router.push('/')
         }
       }
-    } catch (err) {
+    } catch {
       setError('Something went wrong. Please try again.')
     } finally {
       setIsLoading(false)

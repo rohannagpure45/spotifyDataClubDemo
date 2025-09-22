@@ -1,7 +1,7 @@
 'use client'
 
-import { useSession, signIn, signOut } from 'next-auth/react'
-import { User, LogOut, Music } from 'lucide-react'
+import { useSession, signOut } from 'next-auth/react'
+import { User, LogOut } from 'lucide-react'
 import Link from 'next/link'
 
 export default function UserNav() {
@@ -42,10 +42,10 @@ export default function UserNav() {
         </div>
         <div className="hidden md:block">
           <p className="text-sm font-medium text-[var(--text-primary)]">
-            {session.user.name}
+            {session.user?.name ?? ''}
           </p>
           <p className="text-xs text-[var(--text-secondary)]">
-            {session.user.major} • {session.user.year}
+            {(session.user as { major?: string })?.major ?? ''} • {(session.user as { year?: string })?.year ?? ''}
           </p>
         </div>
       </div>

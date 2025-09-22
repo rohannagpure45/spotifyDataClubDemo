@@ -5,27 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 
-interface FormResponse {
-  timestamp: string
-  email: string
-  name: string
-  major: string
-  year: string
-  favoriteSongs: string[]
-  favoriteArtists: string[]
-  genres: string[]
-  listeningHabits: {
-    hoursPerDay: number
-    preferredTime: string
-    mood: string
-  }
-  musicPreferences: {
-    energy: number
-    valence: number
-    danceability: number
-    acousticness: number
-  }
-}
+// (Removed unused FormResponse interface to satisfy lint)
 
 interface ProcessedMember {
   id: string
@@ -671,20 +651,21 @@ export async function POST(request: Request) {
     calculateCompatibilities(members)
 
     // Create users for all email addresses in responses and store form data
-    for (const response of responses) {
-      if (response.email) {
+    for (const response of responses as FormRow[]) {
+      const email = getStr(response, 'email')
+      if (email) {
         const user = await ensureUserExists(
-          response.email,
-          response.name,
-          response.major,
-          response.year
+          email,
+          getStr(response, 'name'),
+          getStr(response, 'major'),
+          getStr(response, 'year')
         )
 
         // Store the form response
         await prisma.formResponse.create({
           data: {
             userId: user.id,
-            email: response.email,
+            email: email,
             formData: JSON.stringify(response),
             sourceType: file ? 'csv' : 'sheets',
             sourceUrl: sheetsUrl || null,
@@ -693,11 +674,13 @@ export async function POST(request: Request) {
         })
 
         // Store music submission if it doesn't exist
-        if (response.favorite_artists || response.genres) {
+        const favorite_artists = getStr(response, 'favorite_artists')
+        const genresStr = getStr(response, 'genres')
+        if (favorite_artists || genresStr) {
           const existingSubmission = await prisma.musicSubmission.findFirst({
             where: {
               userId: user.id,
-              songName: response.favorite_song || 'Unknown'
+              songName: getStr(response, 'favorite_song') || 'Unknown'
             }
           })
 
@@ -705,14 +688,14 @@ export async function POST(request: Request) {
             await prisma.musicSubmission.create({
               data: {
                 userId: user.id,
-                songName: response.favorite_song || 'Unknown',
-                artistName: response.favorite_artists || 'Unknown',
-                genres: JSON.stringify(response.genres ? response.genres.split(',') : []),
-                energy: parseFloat(response.energy || '0.5'),
-                valence: parseFloat(response.valence || '0.5'),
-                danceability: parseFloat(response.danceability || '0.5'),
-                acousticness: parseFloat(response.acousticness || '0.5'),
-                tempo: parseFloat(response.tempo || '120')
+                songName: getStr(response, 'favorite_song') || 'Unknown',
+                artistName: favorite_artists || 'Unknown',
+                genres: JSON.stringify(genresStr ? genresStr.split(',') : []),
+                energy: parseFloat(getStr(response, 'energy') || '0.5'),
+                valence: parseFloat(getStr(response, 'valence') || '0.5'),
+                danceability: parseFloat(getStr(response, 'danceability') || '0.5'),
+                acousticness: parseFloat(getStr(response, 'acousticness') || '0.5'),
+                tempo: parseFloat(getStr(response, 'tempo') || '120')
               }
             })
           }
@@ -849,7 +832,7 @@ export async function GET(request: Request) {
         'Content-Disposition': `attachment; filename="music-groups-${Date.now()}.csv"`
       }
     })
-  } catch (error) {
+  } catch {
     return NextResponse.json({
       success: false,
       error: 'Invalid group data'

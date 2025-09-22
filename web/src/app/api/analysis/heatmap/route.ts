@@ -51,7 +51,7 @@ export async function GET() {
               byGenre.set(genre, (byGenre.get(genre) || 0) + 1)
             }
           }
-        } catch (_) {
+        } catch {
           // Ignore malformed group rows
         }
       }
@@ -105,7 +105,7 @@ export async function GET() {
         let genres: string[] = []
         try {
           genres = JSON.parse(s.genres || '[]')
-        } catch (_) {
+        } catch {
           genres = []
         }
         if (!major) continue
@@ -177,7 +177,7 @@ export async function GET() {
       insights
     }
     return NextResponse.json(fallback)
-  } catch (e) {
+  } catch {
     // Preserve original static demo on unexpected error
     const features = ['Energy','Danceability','Valence','Acousticness','Instrumentalness','Speechiness']
     const matrix = [

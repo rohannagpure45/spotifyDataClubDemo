@@ -1,7 +1,6 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { useSession } from 'next-auth/react'
 import { Music, Users, BarChart3, Gamepad2, Trophy, Activity, Sparkles, Network, Users2, Joystick } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -84,8 +83,25 @@ type GenreMatchData = { matches: GenreMatchItem[] }
 type ModalType = 'clustering' | 'heatmap' | 'pca' | 'audioMatch' | 'genreMatch'
 type ModalContentState = { title: string; type: ModalType; data?: ClustersApiResponse | HeatmapMajorGenreData | FeatureCorrelationData | AudioMatchData | GenreMatchData | null }
 
+// PCA data type for visualization
+type PCAData = {
+  components: {
+    name: string
+    variance: number
+    features: {
+      feature: string
+      loading: number
+    }[]
+  }[]
+  musicDNA: {
+    userId: string
+    username: string
+    coordinates: [number, number, number]
+    dominantTraits: string[]
+  }[]
+}
+
 export default function SpotifyDashboard() {
-  const { data: session } = useSession()
   const [liveResponses] = useState(42)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalContent, setModalContent] = useState<ModalContentState>({title: '', type: 'heatmap'})
@@ -184,20 +200,20 @@ export default function SpotifyDashboard() {
         return
       }
       setPrediction(data)
-    } catch (e) {
+    } catch {
       setPredictError('Prediction failed. Please try again.')
     } finally {
       setPredictLoading(false)
     }
   }
 
-  const handleOpenModal = async (title: string, type: string) => {
+  const handleOpenModal = async (title: string, type: ModalType) => {
     setLoading(true)
     setModalContent({title, type})
     setModalOpen(true)
 
     try {
-      let data
+      let data: ClustersApiResponse | HeatmapMajorGenreData | FeatureCorrelationData | AudioMatchData | GenreMatchData | null
       let response: Response | null = null
 
       switch(type) {
@@ -344,7 +360,7 @@ export default function SpotifyDashboard() {
         if (!resp.ok) return
         const data = await resp.json()
         if (!cancelled) setIsAdmin(!!data.isAdmin)
-      } catch (_) {}
+      } catch {}
     }
     checkAdmin()
     return () => { cancelled = true }
@@ -360,7 +376,7 @@ export default function SpotifyDashboard() {
       }
       const data = await resp.json()
       setAdminSummary({ totalUsers: data.totalUsers, placeholders: data.placeholders })
-    } catch (e) {
+    } catch {
       setAdminError('Failed to load summary')
     }
   }
@@ -377,7 +393,7 @@ export default function SpotifyDashboard() {
       }
       await refreshAdminSummary()
       alert(`Backfill complete: ${data.updatedUsers} users updated (scanned ${data.scannedUsers}).`)
-    } catch (e) {
+    } catch {
       setAdminError('Backfill failed')
     } finally {
       setAdminBusy(false)
@@ -812,7 +828,7 @@ export default function SpotifyDashboard() {
                               </div>
                             </div>
                             <div className="space-y-2 mb-3">
-                              {group.members.map((member: UIGroupMember, memberIndex: number) => (
+                              {group.members.map((member: UIGroupMember) => (
                                 <div key={member.userId} className="flex items-center gap-2">
                                   <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center text-xs text-white font-bold">
                                     {member.username.charAt(0).toUpperCase()}
@@ -1462,7 +1478,7 @@ export default function SpotifyDashboard() {
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Musical Neighborhood Clusters</h3>
                   <div className="grid grid-cols-2 gap-4">
-                        { (modalContent.data as ClustersApiResponse | undefined)?.clusters?.map((cluster: ClusterGroup, index: number) => {
+                    { (modalContent.data as ClustersApiResponse | undefined)?.clusters?.map((cluster: ClusterGroup, index: number) => {
                       const colors = ['accent-secondary', 'accent-primary', 'spotify-green', 'accent-warning']
                       const color = colors[index % colors.length]
                       const energyWidth = Math.round(cluster.features.energy * 100)
@@ -1486,114 +1502,124 @@ export default function SpotifyDashboard() {
                     })}
                   </div>
                   <p className="text-sm text-[var(--text-tertiary)] mt-4">
-                    K-means clustering identified {modalContent.data.clusters?.length || 0} distinct musical taste groups with {modalContent.data.totalUsers || 0} total users.
+                    K-means clustering identified {(modalContent.data as ClustersApiResponse | undefined)?.clusters?.length || 0} distinct musical taste groups with {(modalContent.data as ClustersApiResponse | undefined)?.totalUsers || 0} total users.
                   </p>
                 </div>
               )}
 
           {modalContent.type === 'heatmap' && (
             <div>
-              {modalContent.data?.type === 'major-genre' ? (
-                <>
-                  <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Major vs Genre Heatmap (Your Dataset)</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[var(--border-primary)]">
-                          <th className="p-2 text-left text-[var(--text-secondary)]">Major</th>
-                          {modalContent.data.genres.map((g: string) => (
-                            <th key={g} className="p-2 text-center text-[var(--text-secondary)]">{g}</th>
+              {(() => {
+                const d = modalContent.data
+                const isMajorGenre = !!d && typeof d === 'object' && 'majors' in d && 'genres' in d && 'matrix' in d
+                const isFeatureCorr = !!d && typeof d === 'object' && 'features' in d && 'matrix' in d && !('majors' in d)
+                if (isMajorGenre) {
+                  const data = d as HeatmapMajorGenreData
+                  return (
+                    <>
+                      <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Major vs Genre Heatmap (Your Dataset)</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-[var(--border-primary)]">
+                              <th className="p-2 text-left text-[var(--text-secondary)]">Major</th>
+                              {data.genres.map((g: string) => (
+                                <th key={g} className="p-2 text-center text-[var(--text-secondary)]">{g}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.majors.map((major: string, mi: number) => (
+                              <tr key={major} className="border-b border-[var(--border-primary)]">
+                                <td className="p-2 font-medium text-[var(--text-primary)]">{major}</td>
+                                {data.genres.map((_: string, gi: number) => {
+                                  const intensity = Math.max(0, Math.min(1, data.matrix[mi][gi] || 0))
+                                  const count = data.counts?.[mi]?.[gi] ?? 0
+                                  const bg = `rgba(30, 215, 96, ${intensity})`
+                                  return (
+                                    <td key={`${major}-${gi}`} className="p-2 text-center">
+                                      <div
+                                        className="w-9 h-9 mx-auto rounded flex items-center justify-center text-[var(--text-primary)]"
+                                        style={{ backgroundColor: bg }}
+                                        title={`${count} matches`}
+                                      >
+                                        <span className="text-[10px] font-semibold" style={{ mixBlendMode: 'screen' }}>{count}</span>
+                                      </div>
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {data.insights?.length > 0 && (
+                        <ul className="mt-4 text-sm text-[var(--text-tertiary)] list-disc pl-5">
+                          {data.insights.map((s: string, i: number) => (
+                            <li key={i}>{s}</li>
                           ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {modalContent.data.majors.map((major: string, mi: number) => (
-                          <tr key={major} className="border-b border-[var(--border-primary)]">
-                            <td className="p-2 font-medium text-[var(--text-primary)]">{major}</td>
-                            {modalContent.data.genres.map((_: string, gi: number) => {
-                              const intensity = Math.max(0, Math.min(1, modalContent.data.matrix[mi][gi] || 0))
-                              const count = modalContent.data.counts?.[mi]?.[gi] ?? 0
-                              const bg = `rgba(30, 215, 96, ${intensity})` // Spotify green with alpha by intensity
-                              return (
-                                <td key={`${major}-${gi}`} className="p-2 text-center">
-                                  <div
-                                    className="w-9 h-9 mx-auto rounded flex items-center justify-center text-[var(--text-primary)]"
-                                    style={{ backgroundColor: bg }}
-                                    title={`${count} matches`}
-                                  >
-                                    <span className="text-[10px] font-semibold" style={{ mixBlendMode: 'screen' }}>{count}</span>
-                                  </div>
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {modalContent.data.insights?.length > 0 && (
-                    <ul className="mt-4 text-sm text-[var(--text-tertiary)] list-disc pl-5">
-                      {modalContent.data.insights.map((s: string, i: number) => (
-                        <li key={i}>{s}</li>
-                      ))}
-                    </ul>
-                  )}
-                  <p className="text-sm text-[var(--text-tertiary)] mt-2">
-                    Darker cells indicate stronger major–genre concentration in your imported data.
-                  </p>
-                </>
-              ) : modalContent.data?.type === 'feature-correlation' ? (
-                <>
-                  <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Audio Feature Correlation</h3>
-                  <div className="overflow-x-auto">
-                    <table className="w-full text-sm">
-                      <thead>
-                        <tr className="border-b border-[var(--border-primary)]">
-                          <th className="p-2 text-left text-[var(--text-secondary)]">Feature</th>
-                          {modalContent.data.features.map((f: string) => (
-                            <th key={f} className="p-2 text-center text-[var(--text-secondary)]">{f}</th>
+                        </ul>
+                      )}
+                      <p className="text-sm text-[var(--text-tertiary)] mt-2">
+                        Darker cells indicate stronger major–genre concentration in your imported data.
+                      </p>
+                    </>
+                  )
+                }
+                if (isFeatureCorr) {
+                  const data = d as FeatureCorrelationData
+                  return (
+                    <>
+                      <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Audio Feature Correlation</h3>
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                          <thead>
+                            <tr className="border-b border-[var(--border-primary)]">
+                              <th className="p-2 text-left text-[var(--text-secondary)]">Feature</th>
+                              {data.features.map((f: string) => (
+                                <th key={f} className="p-2 text-center text-[var(--text-secondary)]">{f}</th>
+                              ))}
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {data.features.map((rowName: string, i: number) => (
+                              <tr key={rowName} className="border-b border-[var(--border-primary)]">
+                                <td className="p-2 font-medium text-[var(--text-primary)]">{rowName}</td>
+                                {data.features.map((_: string, j: number) => {
+                                  const v = data.matrix[i][j]
+                                  const intensity = Math.max(0, Math.min(1, (v + 1) / 2))
+                                  const bg = `rgba(30, 215, 96, ${intensity})`
+                                  return (
+                                    <td key={`${i}-${j}`} className="p-2 text-center">
+                                      <div className="w-9 h-9 mx-auto rounded flex items-center justify-center" style={{ backgroundColor: bg }}>
+                                        <span className="text-[10px] text-[var(--background)] font-semibold">{v.toFixed(2)}</span>
+                                      </div>
+                                    </td>
+                                  )
+                                })}
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                      {data.insights?.length > 0 && (
+                        <ul className="mt-4 text-sm text-[var(--text-tertiary)] list-disc pl-5">
+                          {data.insights.map((s: string, i: number) => (
+                            <li key={i}>{s}</li>
                           ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {modalContent.data.features.map((rowName: string, i: number) => (
-                          <tr key={rowName} className="border-b border-[var(--border-primary)]">
-                            <td className="p-2 font-medium text-[var(--text-primary)]">{rowName}</td>
-                            {modalContent.data.features.map((_: string, j: number) => {
-                              const v = modalContent.data.matrix[i][j]
-                              // Map [-1,1] to [0,1] for tint
-                              const intensity = Math.max(0, Math.min(1, (v + 1) / 2))
-                              const bg = `rgba(30, 215, 96, ${intensity})`
-                              return (
-                                <td key={`${i}-${j}`} className="p-2 text-center">
-                                  <div className="w-9 h-9 mx-auto rounded flex items-center justify-center" style={{ backgroundColor: bg }}>
-                                    <span className="text-[10px] text-[var(--background)] font-semibold">{v.toFixed(2)}</span>
-                                  </div>
-                                </td>
-                              )
-                            })}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                  {modalContent.data.insights?.length > 0 && (
-                    <ul className="mt-4 text-sm text-[var(--text-tertiary)] list-disc pl-5">
-                      {modalContent.data.insights.map((s: string, i: number) => (
-                        <li key={i}>{s}</li>
-                      ))}
-                    </ul>
-                  )}
-                </>
-              ) : (
-                <div className="text-[var(--text-secondary)]">No heatmap data available.</div>
-              )}
+                        </ul>
+                      )}
+                    </>
+                  )
+                }
+                return <div className="text-[var(--text-secondary)]">No heatmap data available.</div>
+              })()}
             </div>
           )}
 
           {modalContent.type === 'pca' && (
             modalContent.data ? (
-              <PCA3DVisualization data={modalContent.data} />
+              <PCA3DVisualization data={modalContent.data as PCAData} />
             ) : (
               <div className="text-center py-8">
                 <div className="w-16 h-16 rounded-full bg-[var(--accent-error)]/10 flex items-center justify-center mx-auto mb-4">

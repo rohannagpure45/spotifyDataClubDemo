@@ -13,7 +13,7 @@ export default withAuth(
         url.host = host
         return NextResponse.redirect(url)
       }
-    } catch (_) {
+    } catch {
       // no-op on middleware errors
     }
   },
