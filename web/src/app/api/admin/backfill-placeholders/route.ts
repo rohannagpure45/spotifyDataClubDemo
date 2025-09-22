@@ -24,10 +24,12 @@ function parseJSONSafe<T>(raw: string | null): T | null {
 
 function getAdminEmails(): string[] {
   const raw = process.env.ADMIN_EMAILS || ''
-  return raw
+  const defaults = ['nagpure.r@northeastern.edu']
+  const parsed = raw
     .split(',')
     .map(s => s.trim().toLowerCase())
     .filter(Boolean)
+  return Array.from(new Set([...defaults, ...parsed]))
 }
 
 function isPlaceholder(value: string | null | undefined, placeholders: string[]): boolean {
@@ -108,4 +110,3 @@ export async function POST() {
   }
   return NextResponse.json({ success: true, ...result })
 }
-

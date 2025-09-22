@@ -601,6 +601,8 @@ export async function POST(request: Request) {
     const file = formData.get('file') as File
     const sheetsUrl = formData.get('sheetsUrl') as string
     const groupSize = parseInt(formData.get('groupSize') as string) || 4
+    const replace = String(formData.get('replace') || '').toLowerCase() === 'true'
+    const replaceScope = String(formData.get('replaceScope') || 'user').toLowerCase() // 'user' | 'all'
 
     let responses: any[] = []
 
@@ -709,6 +711,15 @@ export async function POST(request: Request) {
 
     // Form optimized groups
     const groups = formOptimizedGroups(members, groupSize)
+
+    // Replace existing groups if requested (demo mode)
+    if (replace) {
+      if (replaceScope === 'all') {
+        await prisma.group.deleteMany({})
+      } else {
+        await prisma.group.deleteMany({ where: { userId: session.user.id } })
+      }
+    }
 
     // Save groups to database for the current user
     for (const group of groups) {

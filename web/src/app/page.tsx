@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from 'next-auth/react'
 import { Music, Users, BarChart3, Gamepad2, Trophy, Activity, Sparkles, Network, Users2 } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,6 +21,7 @@ const getColorClass = (color: string, prefix: 'text' | 'bg' = 'text') => {
 }
 
 export default function SpotifyDashboard() {
+  const { data: session } = useSession()
   const [liveResponses] = useState(42)
   const [modalOpen, setModalOpen] = useState(false)
   const [modalContent, setModalContent] = useState<{title: string, type: string, data?: any}>({title: '', type: ''})
@@ -33,6 +35,7 @@ export default function SpotifyDashboard() {
   const [autoImport, setAutoImport] = useState(false)
   const [autoRefreshSaved, setAutoRefreshSaved] = useState(false)
   const [isRefreshingSaved, setIsRefreshingSaved] = useState(false)
+  const [replaceExisting, setReplaceExisting] = useState(false)
   const [predictLoading, setPredictLoading] = useState(false)
   const [predictError, setPredictError] = useState<string | null>(null)
   const [prediction, setPrediction] = useState<any | null>(null)
@@ -189,6 +192,8 @@ export default function SpotifyDashboard() {
       const formData = new FormData()
       formData.append('sheetsUrl', googleSheetsUrl)
       formData.append('groupSize', String(groupSize))
+      formData.append('replace', String(replaceExisting))
+      formData.append('replaceScope', 'all')
 
       const response = await fetch('/api/google/process-forms', {
         method: 'POST',
@@ -219,6 +224,8 @@ export default function SpotifyDashboard() {
         const formData = new FormData()
         formData.append('sheetsUrl', googleSheetsUrl)
         formData.append('groupSize', String(groupSize))
+        formData.append('replace', 'true')
+        formData.append('replaceScope', 'all')
 
         const response = await fetch('/api/google/process-forms', {
           method: 'POST',
@@ -236,6 +243,47 @@ export default function SpotifyDashboard() {
 
     return () => clearInterval(interval)
   }, [autoImport, googleSheetsUrl, groupSize])
+
+  // Admin tools state
+  const adminEmail = 'nagpure.r@northeastern.edu'
+  const isAdmin = (session?.user?.email || '').toLowerCase() === adminEmail
+  const [adminBusy, setAdminBusy] = useState(false)
+  const [adminError, setAdminError] = useState<string | null>(null)
+  const [adminSummary, setAdminSummary] = useState<{ totalUsers: number; placeholders: number } | null>(null)
+
+  const refreshAdminSummary = async () => {
+    setAdminError(null)
+    try {
+      const resp = await fetch('/api/admin/backfill-placeholders')
+      if (!resp.ok) {
+        setAdminError(`Failed to load summary: ${resp.status}`)
+        return
+      }
+      const data = await resp.json()
+      setAdminSummary({ totalUsers: data.totalUsers, placeholders: data.placeholders })
+    } catch (e) {
+      setAdminError('Failed to load summary')
+    }
+  }
+
+  const runBackfill = async () => {
+    setAdminBusy(true)
+    setAdminError(null)
+    try {
+      const resp = await fetch('/api/admin/backfill-placeholders', { method: 'POST' })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) {
+        setAdminError(data.error || `Backfill failed: ${resp.status}`)
+        return
+      }
+      await refreshAdminSummary()
+      alert(`Backfill complete: ${data.updatedUsers} users updated (scanned ${data.scannedUsers}).`)
+    } catch (e) {
+      setAdminError('Backfill failed')
+    } finally {
+      setAdminBusy(false)
+    }
+  }
 
   // Auto-refresh saved groups by polling GET /api/groups every 10 seconds
   useEffect(() => {
@@ -550,12 +598,12 @@ export default function SpotifyDashboard() {
                         </svg>
                         Google Integration
                       </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div>
-                          <input
-                            type="text"
-                            placeholder="Google Sheets/Forms URL"
-                            value={googleSheetsUrl}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div>
+                            <input
+                              type="text"
+                              placeholder="Google Sheets/Forms URL"
+                              value={googleSheetsUrl}
                             onChange={(e) => setGoogleSheetsUrl(e.target.value)}
                             className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-sm text-[var(--text-primary)] placeholder-[var(--text-tertiary)]"
                           />
@@ -566,6 +614,15 @@ export default function SpotifyDashboard() {
                           >
                             {importingFromGoogle ? 'Importing...' : '📥 Import + Process'}
                           </button>
+                          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                            <input
+                              type="checkbox"
+                              checked={replaceExisting}
+                              onChange={(e) => setReplaceExisting(e.target.checked)}
+                              className="accent-[var(--accent-primary)]"
+                            />
+                            Replace existing groups (demo)
+                          </label>
                           <button
                             onClick={refreshSavedGroups}
                             disabled={isRefreshingSaved}
@@ -835,6 +892,41 @@ export default function SpotifyDashboard() {
                       </div>
                     </div>
                   </div>
+                  {isAdmin && (
+                    <div className="mt-4 p-4 rounded-lg bg-[var(--surface-tertiary)]/50 border border-[var(--border-primary)]">
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-sm font-medium text-[var(--text-primary)]">Admin Tools</div>
+                        <button
+                          onClick={refreshAdminSummary}
+                          className="px-3 py-1 text-xs rounded bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)]"
+                        >
+                          Refresh Summary
+                        </button>
+                      </div>
+                      {adminError && (
+                        <div className="text-xs text-[var(--accent-error)] mb-2">{adminError}</div>
+                      )}
+                      <div className="text-xs text-[var(--text-secondary)]">
+                        {adminSummary ? (
+                          <div>
+                            <div>Total users: {adminSummary.totalUsers}</div>
+                            <div>Users with placeholders: {adminSummary.placeholders}</div>
+                          </div>
+                        ) : (
+                          <div>Summary not loaded.</div>
+                        )}
+                      </div>
+                      <div className="mt-2">
+                        <button
+                          onClick={runBackfill}
+                          disabled={adminBusy}
+                          className="px-4 py-2 text-xs rounded bg-[var(--accent-warning)]/20 hover:bg-[var(--accent-warning)]/30 text-[var(--text-primary)] disabled:opacity-50"
+                        >
+                          {adminBusy ? 'Backfilling…' : 'Backfill Placeholder Profiles'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
