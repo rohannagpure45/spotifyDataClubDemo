@@ -17,7 +17,7 @@ const Plot = dynamic(() => import('react-plotly.js'), {
   ),
 })
 
-interface PCAData {
+export interface PCAData {
   components: {
     name: string
     variance: number

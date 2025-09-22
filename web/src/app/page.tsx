@@ -5,7 +5,7 @@ import { Music, Users, BarChart3, Gamepad2, Trophy, Activity, Sparkles, Network,
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Modal } from "@/components/ui/modal"
-import PCA3DVisualization from "@/components/PCA3DVisualization"
+import PCA3DVisualization, { type PCAData } from "@/components/PCA3DVisualization"
 import SnakeGame from "@/components/SnakeGame"
 
 // Helper function to get color class based on color name
@@ -83,23 +83,6 @@ type GenreMatchData = { matches: GenreMatchItem[] }
 type ModalType = 'clustering' | 'heatmap' | 'pca' | 'audioMatch' | 'genreMatch'
 type ModalContentState = { title: string; type: ModalType; data?: ClustersApiResponse | HeatmapMajorGenreData | FeatureCorrelationData | AudioMatchData | GenreMatchData | null }
 
-// PCA data type for visualization
-type PCAData = {
-  components: {
-    name: string
-    variance: number
-    features: {
-      feature: string
-      loading: number
-    }[]
-  }[]
-  musicDNA: {
-    userId: string
-    username: string
-    coordinates: [number, number, number]
-    dominantTraits: string[]
-  }[]
-}
 
 export default function SpotifyDashboard() {
   const [liveResponses] = useState(42)
@@ -1619,7 +1602,7 @@ export default function SpotifyDashboard() {
 
           {modalContent.type === 'pca' && (
             modalContent.data ? (
-              <PCA3DVisualization data={modalContent.data as PCAData} />
+              <PCA3DVisualization data={modalContent.data as unknown as PCAData} />
             ) : (
               <div className="text-center py-8">
                 <div className="w-16 h-16 rounded-full bg-[var(--accent-error)]/10 flex items-center justify-center mx-auto mb-4">
