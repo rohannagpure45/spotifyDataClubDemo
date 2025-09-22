@@ -32,6 +32,7 @@ export default function SpotifyDashboard() {
   const [importingFromGoogle, setImportingFromGoogle] = useState(false)
   const [autoImport, setAutoImport] = useState(false)
   const [autoRefreshSaved, setAutoRefreshSaved] = useState(false)
+  const [isRefreshingSaved, setIsRefreshingSaved] = useState(false)
 
   // Helper to normalize group objects for UI/Export compatibility
   const normalizeGroups = (apiGroups: any[]) =>
@@ -50,6 +51,20 @@ export default function SpotifyDashboard() {
       sharedInterests: g.sharedInterests || [],
       meetingIdeas: g.meetingIdeas || []
     }))
+
+  const refreshSavedGroups = async () => {
+    try {
+      setIsRefreshingSaved(true)
+      const resp = await fetch('/api/groups?limit=50')
+      if (!resp.ok) return
+      const payload = await resp.json()
+      setGroups(normalizeGroups(payload.groups || []))
+    } catch (e) {
+      console.debug('Manual refresh fetch error (ignored):', e)
+    } finally {
+      setIsRefreshingSaved(false)
+    }
+  }
 
   const handleOpenModal = async (title: string, type: string) => {
     setLoading(true)
@@ -513,6 +528,13 @@ export default function SpotifyDashboard() {
                             className="mt-2 w-full px-4 py-2 bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                           >
                             {importingFromGoogle ? 'Importing...' : '📥 Import + Process'}
+                          </button>
+                          <button
+                            onClick={refreshSavedGroups}
+                            disabled={isRefreshingSaved}
+                            className="mt-2 w-full px-4 py-2 bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                          >
+                            {isRefreshingSaved ? 'Refreshing...' : '🔄 Refresh Saved Groups'}
                           </button>
                           <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                             <input
