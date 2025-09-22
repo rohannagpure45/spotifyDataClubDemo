@@ -34,12 +34,24 @@ export async function GET(request: Request) {
       take: limit
     })
 
+    const sanitizeMembers = (members: any[]) =>
+      (members || []).map((m) => ({
+        // Remove email or any extra PII from public view
+        userId: m.userId || m.id || undefined,
+        name: m.username || m.name || 'Member',
+        major: m.major || 'Unknown',
+        topGenres: m.topGenres || m.musicProfile?.topGenres || [],
+        listeningStyle: m.musicProfile?.listeningStyle || m.role || undefined
+      }))
+
     const groups = rows.map((g) => ({
       id: g.id,
       name: g.name,
       createdAt: g.createdAt,
       compatibility: g.compatibility,
-      members: safeParseJSON(g.members, []),
+      members: publicScope
+        ? sanitizeMembers(safeParseJSON(g.members, []))
+        : safeParseJSON(g.members, []),
       commonGenres: safeParseJSON(g.commonGenres, []),
       recommendations: safeParseJSON(g.recommendations, {}),
       ...(includeCsv ? { csvContent: g.csvContent || null } : {})
