@@ -241,6 +241,14 @@ Submit new song entry:
 - `GET /api/groups?limit=50&public=true` — Fetch recent groups for demo viewing (across users).
 - `POST /api/major/predict` — Predict a user’s major from features or latest submission. Requires a mapped FormResponse for the current user.
 
+### Admin: Backfill Placeholder Profiles
+- Some users may be created with placeholders (e.g., `major='Undeclared'`, `year='Unknown'`).
+- To backfill these fields from the latest `FormResponse`:
+  - Set `ADMIN_EMAILS` in your environment (comma‑separated list).
+  - Call `POST /api/admin/backfill-placeholders` while authenticated as an admin email.
+  - `GET /api/admin/backfill-placeholders` returns a quick summary (counts) without modifying data.
+  - This updates only placeholder fields when valid values exist in the latest form JSON.
+
 ### Demo Tips & Pitfalls
 - Prefer CSV uploads for live demos (Sheets URL uses mock responses in the current code).
 - Avoid leaving “Auto‑import every 60s” running for long — it will keep creating new Groups; use manual refresh to browse saved groups.

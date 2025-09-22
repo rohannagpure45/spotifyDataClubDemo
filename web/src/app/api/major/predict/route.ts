@@ -92,6 +92,17 @@ export async function POST(request: Request) {
       centroids.push({ major, centroid: c, n: vecs.length })
     }
 
+    // Enforce minimum samples per major to stabilize predictions
+    const minSamples = Number.parseInt(process.env.MAJOR_PREDICT_MIN_SAMPLES || '3', 10)
+    const filteredCentroids = centroids.filter(c => c.n >= minSamples)
+    if (filteredCentroids.length < 2) {
+      return NextResponse.json({
+        success: false,
+        error: `Insufficient training data after filtering. Need at least 2 majors with >= ${minSamples} samples each.`,
+        datasetMajors: centroids.map(c => ({ major: c.major, samples: c.n }))
+      }, { status: 400 })
+    }
+
     // Build input vector
     let inputVec: number[] | null = null
     let inputUsed: Features | null = null
@@ -131,7 +142,7 @@ export async function POST(request: Request) {
     }
 
     // Score against centroids
-    const scored = centroids.map(c => ({
+    const scored = filteredCentroids.map(c => ({
       major: c.major,
       similarity: cosine(inputVec!, c.centroid),
       samples: c.n
@@ -149,6 +160,7 @@ export async function POST(request: Request) {
       input: inputUsed,
       method: 'centroid-cosine',
       datasetMajors: centroids.map(c => ({ major: c.major, samples: c.n })),
+      usedMajors: filteredCentroids.map(c => ({ major: c.major, samples: c.n })),
     }
 
     // Persist analysis result for user history

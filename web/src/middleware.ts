@@ -30,6 +30,7 @@ export const config = {
     '/api/google/process-forms',
     '/api/groups/create',
     '/api/groups',
-    '/api/major/predict'
+    '/api/major/predict',
+    '/api/admin/:path*'
   ]
 }
