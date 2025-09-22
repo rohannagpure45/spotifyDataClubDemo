@@ -2,11 +2,12 @@
 
 import { useState, useEffect } from "react"
 import { useSession } from 'next-auth/react'
-import { Music, Users, BarChart3, Gamepad2, Trophy, Activity, Sparkles, Network, Users2 } from "lucide-react"
+import { Music, Users, BarChart3, Gamepad2, Trophy, Activity, Sparkles, Network, Users2, Joystick } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Modal } from "@/components/ui/modal"
 import PCA3DVisualization from "@/components/PCA3DVisualization"
+import SnakeGame from "@/components/SnakeGame"
 
 // Helper function to get color class based on color name
 const getColorClass = (color: string, prefix: 'text' | 'bg' = 'text') => {
@@ -385,7 +386,7 @@ export default function SpotifyDashboard() {
       {/* Main Content */}
       <main className="container mx-auto px-6 py-8">
         <Tabs defaultValue="live-feed" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-[var(--surface-tertiary)] border border-[var(--border-primary)] rounded-xl p-1 shadow-lg">
+          <TabsList className="grid w-full grid-cols-6 bg-[var(--surface-tertiary)] border border-[var(--border-primary)] rounded-xl p-1 shadow-lg">
             <TabsTrigger value="live-feed" className="flex items-center gap-2 data-[state=active]:bg-[var(--spotify-green)]/10 data-[state=active]:text-[var(--spotify-green)] data-[state=active]:shadow-md transition-all duration-200">
               <Activity className="h-4 w-4" />
               <span className="hidden sm:inline">Live Feed</span>
@@ -405,6 +406,10 @@ export default function SpotifyDashboard() {
             <TabsTrigger value="leaderboard" className="flex items-center gap-2 data-[state=active]:bg-[var(--accent-warning)]/10 data-[state=active]:text-[var(--accent-warning)] data-[state=active]:shadow-md transition-all duration-200">
               <Trophy className="h-4 w-4" />
               <span className="hidden sm:inline">Leaderboard</span>
+            </TabsTrigger>
+            <TabsTrigger value="game" className="flex items-center gap-2 data-[state=active]:bg-[var(--accent-success)]/10 data-[state=active]:text-[var(--accent-success)] data-[state=active]:shadow-md transition-all duration-200">
+              <Joystick className="h-4 w-4" />
+              <span className="hidden sm:inline">Mini Game</span>
             </TabsTrigger>
           </TabsList>
 
@@ -1327,6 +1332,26 @@ export default function SpotifyDashboard() {
                       <div className="text-[var(--text-secondary)]">Jordan - Perfect 0.5 valence</div>
                     </div>
                   </div>
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Mini Game Tab */}
+          <TabsContent value="game" className="space-y-6">
+            <Card className="bg-[var(--surface-secondary)] border-[var(--border-primary)] shadow-xl backdrop-blur-sm">
+              <CardHeader>
+                <CardTitle className="text-[var(--accent-success)] flex items-center gap-2">
+                  <Joystick className="h-5 w-5" />
+                  Mini Game: Snake
+                </CardTitle>
+                <CardDescription className="text-[var(--text-secondary)]">
+                  Take a quick break and play a classic. Use arrow keys or WASD.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="max-w-full">
+                  <SnakeGame />
                 </div>
               </CardContent>
             </Card>
