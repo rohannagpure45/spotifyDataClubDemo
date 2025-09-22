@@ -158,6 +158,50 @@ function calculateCompatibilities(members: ProcessedMember[]): void {
 }
 
 // Optimize group formation using clustering algorithm
+// ----- Grouping helpers focused on compatibility cohesion -----
+function centroidOf(members: ProcessedMember[]): number[] {
+  const dim = members[0]?.musicProfile.preferenceVector.length || 0
+  const centroid = new Array(dim).fill(0)
+  if (dim === 0) return centroid
+  for (const m of members) {
+    const vec = m.musicProfile.preferenceVector
+    for (let i = 0; i < dim; i++) centroid[i] += vec[i]
+  }
+  for (let i = 0; i < dim; i++) centroid[i] /= members.length
+  return centroid
+}
+
+function avgCompatWithGroup(candidate: ProcessedMember, group: ProcessedMember[]): number {
+  if (group.length === 0) return 0
+  const sum = group.reduce((s, m) => s + (m.compatibility.get(candidate.id) || 0), 0)
+  return sum / group.length
+}
+
+function genreOverlapWithGroup(candidate: ProcessedMember, group: ProcessedMember[]): number {
+  const groupGenres = new Set<string>()
+  for (const m of group) m.musicProfile.topGenres.forEach(g => groupGenres.add(g))
+  const candGenres = new Set(candidate.musicProfile.topGenres)
+  const intersection = [...candGenres].filter(g => groupGenres.has(g))
+  const union = new Set([...candGenres, ...Array.from(groupGenres)])
+  return union.size > 0 ? intersection.length / union.size : 0
+}
+
+function computePairStats(members: ProcessedMember[]): { mean: number; std: number; pairs: Array<{a: number; b: number; w: number}> } {
+  const pairs: Array<{a: number; b: number; w: number}> = []
+  const all: number[] = []
+  for (let i = 0; i < members.length; i++) {
+    for (let j = i + 1; j < members.length; j++) {
+      const w = members[i].compatibility.get(members[j].id) || 0
+      pairs.push({ a: i, b: j, w })
+      all.push(w)
+    }
+  }
+  const mean = all.reduce((s, v) => s + v, 0) / (all.length || 1)
+  const variance = all.reduce((s, v) => s + Math.pow(v - mean, 2), 0) / (all.length || 1)
+  const std = Math.sqrt(variance)
+  return { mean, std, pairs }
+}
+
 function formOptimizedGroups(
   members: ProcessedMember[],
   targetGroupSize: number
@@ -165,64 +209,116 @@ function formOptimizedGroups(
   const groups: OptimizedGroup[] = []
   const assigned = new Set<string>()
 
-  // Sort members by average compatibility to find good starting points
-  const membersByCompatibility = [...members].sort((a, b) => {
-    const avgA = Array.from(a.compatibility.values()).reduce((s, v) => s + v, 0) / a.compatibility.size
-    const avgB = Array.from(b.compatibility.values()).reduce((s, v) => s + v, 0) / b.compatibility.size
-    return avgB - avgA
-  })
+  // Build global stats and high-compatibility seeds (pairs)
+  const { mean, std, pairs } = computePairStats(members)
+  const sortedPairs = pairs.sort((p1, p2) => p2.w - p1.w)
 
-  let groupId = 1
+  // Seed groups with highest-compatibility pairs
+  for (const p of sortedPairs) {
+    const mA = members[p.a]
+    const mB = members[p.b]
+    if (assigned.has(mA.id) || assigned.has(mB.id)) continue
+    groups.push(createGroupFromMembers([mA, mB], groups.length + 1))
+    assigned.add(mA.id)
+    assigned.add(mB.id)
+    if (assigned.size >= members.length) break
+  }
 
-  for (const seed of membersByCompatibility) {
-    if (assigned.has(seed.id)) continue
-
-    const group: ProcessedMember[] = [seed]
+  // If no groups created (e.g., all very low compat), fall back to best-avg seeds
+  if (groups.length === 0 && members.length > 0) {
+    const membersByAvg = [...members].sort((a, b) => {
+      const avgA = Array.from(a.compatibility.values()).reduce((s, v) => s + v, 0) / (a.compatibility.size || 1)
+      const avgB = Array.from(b.compatibility.values()).reduce((s, v) => s + v, 0) / (b.compatibility.size || 1)
+      return avgB - avgA
+    })
+    const seed = membersByAvg[0]
+    groups.push(createGroupFromMembers([seed], 1))
     assigned.add(seed.id)
+  }
 
-    // Find most compatible members for this group
-    const candidates = members
-      .filter(m => !assigned.has(m.id))
-      .sort((a, b) => {
-        const compatA = seed.compatibility.get(a.id) || 0
-        const compatB = seed.compatibility.get(b.id) || 0
-        return compatB - compatA
-      })
+  // Greedily grow each group with candidates that maximize internal cohesion
+  const baseThreshold = mean + 0.25 * std // dynamic accept threshold baseline
+  const alpha = 0.6 // weight for average pairwise compatibility with group
+  const beta = 0.25 // weight for centroid similarity
+  const gamma = 0.15 // weight for genre overlap
 
-    // Add members to group based on compatibility
-    for (const candidate of candidates) {
-      if (group.length >= targetGroupSize) break
+  for (const g of groups) {
+    // Extract mutable list of members from created group
+    const current: ProcessedMember[] = [...g.members]
+    while (current.length < targetGroupSize) {
+      let best: { m: ProcessedMember; score: number; avg: number } | null = null
+      const centroid = centroidOf(current)
 
-      // Calculate average compatibility with existing group members
-      const avgCompat = group.reduce((sum, member) =>
-        sum + (member.compatibility.get(candidate.id) || 0), 0
-      ) / group.length
+      for (const cand of members) {
+        if (assigned.has(cand.id)) continue
+        const avg = avgCompatWithGroup(cand, current)
+        const centroidSim = calculateSimilarity(cand.musicProfile.preferenceVector, centroid)
+        const genreSim = genreOverlapWithGroup(cand, current)
+        const score = alpha * avg + beta * centroidSim + gamma * genreSim
+        if (!best || score > best.score) best = { m: cand, score, avg }
+      }
 
-      // Add if compatibility is above threshold
-      if (avgCompat > 0.4) {
-        group.push(candidate)
-        assigned.add(candidate.id)
+      if (!best) break
+
+      // Adaptive threshold: slightly relax as group fills to avoid getting stuck
+      const relax = 0.08 * Math.max(0, current.length - 2)
+      const acceptThreshold = Math.max(0.2, baseThreshold - relax)
+
+      if (best.avg >= acceptThreshold || current.length < 2) {
+        current.push(best.m)
+        assigned.add(best.m.id)
+      } else {
+        break // no suitable candidate meets threshold
       }
     }
 
-    // If group has at least 2 members, create it
-    if (group.length >= 2) {
-      groups.push(createGroupFromMembers(group, groupId++))
-    }
+    // Replace group's members with refined selection and recompute metrics
+    const rebuilt = createGroupFromMembers(current, groups.indexOf(g) + 1)
+    g.members = rebuilt.members
+    g.groupCompatibility = rebuilt.groupCompatibility
+    g.commonGenres = rebuilt.commonGenres
+    g.groupDynamics = rebuilt.groupDynamics
+    g.recommendations = rebuilt.recommendations
   }
 
-  // Handle any remaining unassigned members
-  const unassigned = members.filter(m => !assigned.has(m.id))
-  if (unassigned.length > 0) {
-    // Add to existing groups or create new one
-    if (unassigned.length >= 2) {
-      groups.push(createGroupFromMembers(unassigned, groupId++))
-    } else {
-      // Add to smallest existing group
-      const smallestGroup = groups.reduce((min, g) =>
-        g.members.length < min.members.length ? g : min
-      )
-      smallestGroup.members.push(...unassigned)
+  // Handle remaining unassigned members
+  const remaining = members.filter(m => !assigned.has(m.id))
+  // Seed additional groups from remaining high-compatibility pairs
+  while (remaining.length >= 2) {
+    const usablePair = sortedPairs.find(p => !assigned.has(members[p.a].id) && !assigned.has(members[p.b].id))
+    if (!usablePair) break
+    const a = members[usablePair.a]
+    const b = members[usablePair.b]
+    groups.push(createGroupFromMembers([a, b], groups.length + 1))
+    assigned.add(a.id)
+    assigned.add(b.id)
+    // remove from remaining list
+    const idxA = remaining.findIndex(x => x.id === a.id)
+    if (idxA >= 0) remaining.splice(idxA, 1)
+    const idxB = remaining.findIndex(x => x.id === b.id)
+    if (idxB >= 0) remaining.splice(idxB, 1)
+  }
+
+  // Assign any leftovers to the most compatible existing group
+  for (const m of members) {
+    if (assigned.has(m.id)) continue
+    let bestG: { idx: number; gain: number } | null = null
+    for (let gi = 0; gi < groups.length; gi++) {
+      const g = groups[gi]
+      const avg = avgCompatWithGroup(m, g.members as unknown as ProcessedMember[])
+      if (!bestG || avg > bestG.gain) bestG = { idx: gi, gain: avg }
+    }
+    if (bestG) {
+      const g = groups[bestG.idx]
+      ;(g.members as unknown as ProcessedMember[]).push(m)
+      assigned.add(m.id)
+      // Recompute metrics
+      const rebuilt = createGroupFromMembers(g.members as unknown as ProcessedMember[], bestG.idx + 1)
+      g.members = rebuilt.members
+      g.groupCompatibility = rebuilt.groupCompatibility
+      g.commonGenres = rebuilt.commonGenres
+      g.groupDynamics = rebuilt.groupDynamics
+      g.recommendations = rebuilt.recommendations
     }
   }
 
@@ -469,6 +565,20 @@ async function ensureUserExists(email: string, name?: string, major?: string, ye
         autoCreated: true
       }
     })
+  } else {
+    // User exists - update profile with form data if missing
+    const needsUpdate = (!user.major && major) || (!user.year && year) || (!user.name && name)
+
+    if (needsUpdate) {
+      user = await prisma.user.update({
+        where: { email },
+        data: {
+          name: user.name || name || user.name,
+          major: user.major || major,
+          year: user.year || year
+        }
+      })
+    }
   }
 
   return user
