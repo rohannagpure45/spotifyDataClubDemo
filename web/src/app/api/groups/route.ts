@@ -18,8 +18,9 @@ export async function GET(request: Request) {
     const limit = limitParam ? Math.max(1, Math.min(100, parseInt(limitParam))) : 50
     const sinceParam = searchParams.get('since')
     const includeCsv = searchParams.get('includeCsv') === 'true'
+    const publicScope = searchParams.get('public') === 'true'
 
-    const where: any = { userId: session.user.id }
+    const where: any = publicScope ? {} : { userId: session.user.id }
     if (sinceParam) {
       const sinceDate = new Date(sinceParam)
       if (!isNaN(sinceDate.getTime())) {
@@ -59,4 +60,3 @@ function safeParseJSON<T>(value: string | null, fallback: T): T {
     return fallback
   }
 }
-
