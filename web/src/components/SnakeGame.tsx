@@ -24,16 +24,19 @@ export default function SnakeGame() {
   const [running, setRunning] = useState(false)
   const [gameOver, setGameOver] = useState(false)
   const [score, setScore] = useState(0)
+  const [active, setActive] = useState(true) // active when game is focused/hovered
   const speedRef = useRef(INITIAL_SPEED_MS)
 
   const onKey = useCallback((e: KeyboardEvent) => {
-    if (!running || gameOver) return
+    if (!active) return
     const k = e.key.toLowerCase()
+    if (k.startsWith('arrow')) e.preventDefault()
+    if (!running || gameOver) return
     if ((k === 'arrowup' || k === 'w') && dir.y !== 1) setDir({ x: 0, y: -1 })
     if ((k === 'arrowdown' || k === 's') && dir.y !== -1) setDir({ x: 0, y: 1 })
     if ((k === 'arrowleft' || k === 'a') && dir.x !== 1) setDir({ x: -1, y: 0 })
     if ((k === 'arrowright' || k === 'd') && dir.x !== -1) setDir({ x: 1, y: 0 })
-  }, [dir, running, gameOver])
+  }, [dir, running, gameOver, active])
 
   useEffect(() => {
     window.addEventListener('keydown', onKey)
@@ -106,7 +109,14 @@ export default function SnakeGame() {
   }
 
   return (
-    <div>
+    <div
+      tabIndex={0}
+      onFocus={() => setActive(true)}
+      onBlur={() => setActive(false)}
+      onMouseEnter={() => setActive(true)}
+      onMouseLeave={() => setActive(false)}
+      aria-label="Snake game"
+    >
       <div className="flex items-center justify-between mb-3">
         <div className="text-sm text-[var(--text-secondary)]">Score: <span className="text-[var(--text-primary)] font-semibold">{score}</span></div>
         <div className="flex gap-2">
@@ -122,26 +132,34 @@ export default function SnakeGame() {
         </div>
       </div>
       <div className="rounded-xl p-2 bg-[var(--surface-tertiary)] border border-[var(--border-primary)]">
-        <div
-          className="grid gap-[2px]"
-          style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
-        >
-          {cells.flatMap((row, y) =>
-            row.map((val, x) => (
-              <div
-                key={`${x}-${y}`}
-                className={`w-4 h-4 rounded-sm ${cellClass(val)}`}
-                title={`${x},${y}`}
-              />
-            ))
-          )}
+        <div className="w-full max-w-[420px] aspect-square mx-auto">
+          <div
+            className="grid gap-[2px] w-full h-full"
+            style={{ gridTemplateColumns: `repeat(${BOARD_SIZE}, 1fr)` }}
+          >
+            {cells.flatMap((row, y) =>
+              row.map((val, x) => (
+                <div
+                  key={`${x}-${y}`}
+                  className={`w-full h-full rounded-[2px] ${cellClass(val)}`}
+                  title={`${x},${y}`}
+                />
+              ))
+            )}
+          </div>
         </div>
       </div>
       {gameOver && (
         <div className="mt-3 text-center text-sm text-[var(--accent-error)]">Game Over • Final Score: {score}</div>
       )}
-      <p className="mt-3 text-xs text-[var(--text-tertiary)]">Controls: Arrow keys or WASD. Eat the red squares to grow. Avoid walls and yourself.</p>
+      <div className="mt-3 text-xs text-[var(--text-tertiary)]">
+        <div className="mb-1">Controls: Arrow keys or WASD. Eat the red squares to grow. Avoid walls and yourself.</div>
+        <div className="flex items-center gap-4">
+          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-[var(--accent-primary)]"></span> Head</div>
+          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-[var(--spotify-green)]"></span> Body</div>
+          <div className="flex items-center gap-1"><span className="inline-block w-3 h-3 rounded-sm bg-[var(--accent-error)]"></span> Food</div>
+        </div>
+      </div>
     </div>
   )
 }
-
