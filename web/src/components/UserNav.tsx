@@ -10,7 +10,7 @@ export default function UserNav() {
   if (status === 'loading') {
     return (
       <div className="flex items-center space-x-4">
-        <div className="w-8 h-8 bg-gray-200 rounded-full animate-pulse"></div>
+        <div className="w-8 h-8 bg-[var(--surface-tertiary)] rounded-full animate-pulse"></div>
       </div>
     )
   }
@@ -20,7 +20,7 @@ export default function UserNav() {
       <div className="flex items-center space-x-4">
         <Link
           href="/auth/login"
-          className="text-gray-600 hover:text-gray-900 font-medium"
+          className="text-[var(--text-secondary)] hover:text-[var(--text-primary)] font-medium"
         >
           Sign In
         </Link>
@@ -41,10 +41,10 @@ export default function UserNav() {
           <User className="w-5 h-5 text-white" />
         </div>
         <div className="hidden md:block">
-          <p className="text-sm font-medium text-gray-900">
+          <p className="text-sm font-medium text-[var(--text-primary)]">
             {session.user.name}
           </p>
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-[var(--text-secondary)]">
             {session.user.major} • {session.user.year}
           </p>
         </div>
@@ -52,7 +52,7 @@ export default function UserNav() {
 
       <button
         onClick={() => signOut()}
-        className="flex items-center space-x-2 text-gray-600 hover:text-gray-900 px-3 py-2 rounded-lg hover:bg-gray-100 transition-colors"
+        className="flex items-center space-x-2 text-[var(--text-secondary)] hover:text-[var(--text-primary)] px-3 py-2 rounded-lg hover:bg-[var(--surface-tertiary)] transition-colors"
       >
         <LogOut className="w-4 h-4" />
         <span className="hidden md:inline">Sign Out</span>
