@@ -30,6 +30,7 @@ export default function SpotifyDashboard() {
   const [isFormingGroups, setIsFormingGroups] = useState(false)
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
   const [importingFromGoogle, setImportingFromGoogle] = useState(false)
+  const [autoImport, setAutoImport] = useState(false)
 
   const handleOpenModal = async (title: string, type: string) => {
     setLoading(true)
@@ -114,13 +115,34 @@ export default function SpotifyDashboard() {
     }
     setImportingFromGoogle(true)
     try {
-      const response = await fetch('/api/google/import', {
+      const formData = new FormData()
+      formData.append('sheetsUrl', googleSheetsUrl)
+      formData.append('groupSize', String(groupSize))
+
+      const response = await fetch('/api/google/process-forms', {
         method: 'POST',
-        headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({url: googleSheetsUrl})
+        body: formData
       })
       const data = await response.json()
-      alert(`Successfully imported ${data.count} responses from Google Sheets`)
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to process Google Forms data')
+      }
+
+      const normalized = (data.groups || []).map((g: any, index: number) => ({
+        id: g.id || `group-${index + 1}`,
+        name: g.name || `Group ${index + 1}`,
+        members: (g.members || []).map((m: any) => ({
+          userId: m.id || m.email || m.name,
+          username: m.name || m.email || 'Member',
+          major: m.major || 'Unknown'
+        })),
+        compatibility: typeof g.groupCompatibility === 'number' ? g.groupCompatibility : 0.75,
+        playlistSuggestion: g.recommendations?.playlist || ''
+      }))
+
+      setGroups(normalized)
+      alert(`Processed ${data.summary?.totalResponses ?? normalized.reduce((s: number, g: any) => s + (g.members?.length || 0), 0)} responses into ${data.summary?.totalGroups ?? normalized.length} groups`)
     } catch (error) {
       console.error('Error importing from Google Sheets:', error)
       alert('Failed to import from Google Sheets. Please check the URL and permissions.')
@@ -128,6 +150,45 @@ export default function SpotifyDashboard() {
       setImportingFromGoogle(false)
     }
   }
+
+  // Optional auto-import during demos: periodically process forms from Google Sheets
+  useEffect(() => {
+    if (!autoImport || !googleSheetsUrl) return
+
+    const interval = setInterval(async () => {
+      try {
+        const formData = new FormData()
+        formData.append('sheetsUrl', googleSheetsUrl)
+        formData.append('groupSize', String(groupSize))
+
+        const response = await fetch('/api/google/process-forms', {
+          method: 'POST',
+          body: formData
+        })
+        const data = await response.json()
+        if (!response.ok) return
+
+        const normalized = (data.groups || []).map((g: any, index: number) => ({
+          id: g.id || `group-${index + 1}`,
+          name: g.name || `Group ${index + 1}`,
+          members: (g.members || []).map((m: any) => ({
+            userId: m.id || m.email || m.name,
+            username: m.name || m.email || 'Member',
+            major: m.major || 'Unknown'
+          })),
+          compatibility: typeof g.groupCompatibility === 'number' ? g.groupCompatibility : 0.75,
+          playlistSuggestion: g.recommendations?.playlist || ''
+        }))
+
+        setGroups(normalized)
+      } catch (e) {
+        // Silently ignore background errors during auto-import
+        console.debug('Auto-import error (ignored):', e)
+      }
+    }, 60000) // every 60 seconds
+
+    return () => clearInterval(interval)
+  }, [autoImport, googleSheetsUrl, groupSize])
 
   const handleExportToGoogle = async () => {
     if (groups.length === 0) {
@@ -432,8 +493,17 @@ export default function SpotifyDashboard() {
                             disabled={importingFromGoogle}
                             className="mt-2 w-full px-4 py-2 bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                           >
-                            {importingFromGoogle ? 'Importing...' : '📥 Import Responses'}
+                            {importingFromGoogle ? 'Importing...' : '📥 Import + Process'}
                           </button>
+                          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                            <input
+                              type="checkbox"
+                              checked={autoImport}
+                              onChange={(e) => setAutoImport(e.target.checked)}
+                              className="accent-[var(--spotify-green)]"
+                            />
+                            Auto-import every 60s (demo)
+                          </label>
                         </div>
                         <div className="flex flex-col justify-between">
                           <button
