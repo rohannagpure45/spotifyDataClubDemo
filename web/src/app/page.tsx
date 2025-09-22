@@ -33,6 +33,16 @@ export default function SpotifyDashboard() {
   const [autoImport, setAutoImport] = useState(false)
   const [autoRefreshSaved, setAutoRefreshSaved] = useState(false)
   const [isRefreshingSaved, setIsRefreshingSaved] = useState(false)
+  const [predictLoading, setPredictLoading] = useState(false)
+  const [predictError, setPredictError] = useState<string | null>(null)
+  const [prediction, setPrediction] = useState<any | null>(null)
+  const [featureForm, setFeatureForm] = useState({
+    energy: 0.65,
+    valence: 0.5,
+    danceability: 0.6,
+    acousticness: 0.3,
+    tempo: 120
+  })
 
   // Helper to normalize group objects for UI/Export compatibility
   const normalizeGroups = (apiGroups: any[]) =>
@@ -63,6 +73,33 @@ export default function SpotifyDashboard() {
       console.debug('Manual refresh fetch error (ignored):', e)
     } finally {
       setIsRefreshingSaved(false)
+    }
+  }
+
+  const handlePredict = async (useLatest: boolean) => {
+    setPredictLoading(true)
+    setPredictError(null)
+    setPrediction(null)
+    try {
+      const body = useLatest
+        ? { useLatest: true }
+        : { features: featureForm }
+
+      const resp = await fetch('/api/major/predict', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) {
+        setPredictError(data.error || 'Prediction failed')
+        return
+      }
+      setPrediction(data)
+    } catch (e) {
+      setPredictError('Prediction failed. Please try again.')
+    } finally {
+      setPredictLoading(false)
     }
   }
 
@@ -824,6 +861,121 @@ export default function SpotifyDashboard() {
                   <p className="text-[var(--text-secondary)] max-w-lg mx-auto leading-relaxed">
                     Our Random Forest classifier analyzes Spotify audio features like energy, valence, and danceability to predict academic disciplines with surprising accuracy.
                   </p>
+                </div>
+
+                {/* Predict Form & Results */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="p-6 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)]">
+                    <h4 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Try it: predict your major</h4>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Energy (0-1)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={featureForm.energy}
+                          onChange={(e) => setFeatureForm({ ...featureForm, energy: parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Valence (0-1)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={featureForm.valence}
+                          onChange={(e) => setFeatureForm({ ...featureForm, valence: parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Danceability (0-1)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={featureForm.danceability}
+                          onChange={(e) => setFeatureForm({ ...featureForm, danceability: parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Acousticness (0-1)</label>
+                        <input
+                          type="number"
+                          min={0}
+                          max={1}
+                          step={0.01}
+                          value={featureForm.acousticness}
+                          onChange={(e) => setFeatureForm({ ...featureForm, acousticness: parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)]"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[var(--text-secondary)] mb-1">Tempo (BPM)</label>
+                        <input
+                          type="number"
+                          min={40}
+                          max={220}
+                          step={1}
+                          value={featureForm.tempo}
+                          onChange={(e) => setFeatureForm({ ...featureForm, tempo: parseFloat(e.target.value) })}
+                          className="w-full px-3 py-2 rounded-lg bg-[var(--surface-secondary)] border border-[var(--border-primary)] text-[var(--text-primary)]"
+                        />
+                      </div>
+                    </div>
+                    {predictError && (
+                      <div className="mt-3 p-3 rounded-lg border border-red-400 bg-red-50/10 text-red-300 text-sm">{predictError}</div>
+                    )}
+                    <div className="mt-4 flex flex-col sm:flex-row gap-2">
+                      <button
+                        onClick={() => handlePredict(false)}
+                        disabled={predictLoading}
+                        className="px-4 py-2 bg-[var(--accent-warning)]/20 hover:bg-[var(--accent-warning)]/30 text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {predictLoading ? 'Predicting…' : 'Predict from inputs'}
+                      </button>
+                      <button
+                        onClick={() => handlePredict(true)}
+                        disabled={predictLoading}
+                        className="px-4 py-2 bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                      >
+                        {predictLoading ? 'Predicting…' : 'Use my latest submission'}
+                      </button>
+                    </div>
+                    <p className="mt-2 text-xs text-[var(--text-tertiary)]">Note: Predictions require that your Google Form responses have been processed for your account.</p>
+                  </div>
+
+                  <div className="p-6 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)]">
+                    <h4 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Prediction</h4>
+                    {prediction ? (
+                      <div className="space-y-3">
+                        <div className="text-sm text-[var(--text-secondary)]">Top prediction</div>
+                        <div className="text-2xl font-bold text-[var(--accent-warning)]">{prediction.predictedMajor}</div>
+                        <div className="mt-2">
+                          <div className="text-xs text-[var(--text-tertiary)] mb-1">Top 3 majors</div>
+                          <div className="space-y-2">
+                            {prediction.top3.map((p: any) => (
+                              <div key={p.major} className="flex items-center justify-between">
+                                <span className="text-sm text-[var(--text-secondary)]">{p.major}</span>
+                                <span className="text-sm font-medium text-[var(--accent-success)]">{Math.round(p.probability * 100)}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="mt-4 text-xs text-[var(--text-tertiary)]">
+                          Trained on {prediction.datasetMajors.reduce((s: number, m: any) => s + m.samples, 0)} samples across {prediction.datasetMajors.length} majors.
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-[var(--text-tertiary)] text-sm">No prediction yet. Enter features or use your latest submission.</div>
+                    )}
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

@@ -29,6 +29,7 @@ export const config = {
     '/forms-processor',
     '/api/google/process-forms',
     '/api/groups/create',
-    '/api/groups'
+    '/api/groups',
+    '/api/major/predict'
   ]
 }
