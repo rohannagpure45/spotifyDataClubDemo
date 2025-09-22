@@ -225,7 +225,7 @@ export default function SpotifyDashboard() {
         formData.append('sheetsUrl', googleSheetsUrl)
         formData.append('groupSize', String(groupSize))
         formData.append('replace', 'true')
-        formData.append('replaceScope', 'all')
+        formData.append('replaceScope', 'user')
 
         const response = await fetch('/api/google/process-forms', {
           method: 'POST',
@@ -245,11 +245,24 @@ export default function SpotifyDashboard() {
   }, [autoImport, googleSheetsUrl, groupSize])
 
   // Admin tools state
-  const adminEmail = 'nagpure.r@northeastern.edu'
-  const isAdmin = (session?.user?.email || '').toLowerCase() === adminEmail
+  const [isAdmin, setIsAdmin] = useState(false)
   const [adminBusy, setAdminBusy] = useState(false)
   const [adminError, setAdminError] = useState<string | null>(null)
   const [adminSummary, setAdminSummary] = useState<{ totalUsers: number; placeholders: number } | null>(null)
+
+  useEffect(() => {
+    let cancelled = false
+    const checkAdmin = async () => {
+      try {
+        const resp = await fetch('/api/admin/is-admin')
+        if (!resp.ok) return
+        const data = await resp.json()
+        if (!cancelled) setIsAdmin(!!data.isAdmin)
+      } catch (_) {}
+    }
+    checkAdmin()
+    return () => { cancelled = true }
+  }, [])
 
   const refreshAdminSummary = async () => {
     setAdminError(null)
