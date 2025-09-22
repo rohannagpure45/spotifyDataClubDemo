@@ -142,6 +142,16 @@ Submit new song entry:
 2. Connect to Vercel
 3. Deploy automatically
 
+#### HTTPS and Auth on Vercel
+- Set the following environment variables in your Vercel project settings:
+  - `NEXTAUTH_URL` = `https://your-project-name.vercel.app`
+  - `NEXTAUTH_SECRET` = a long random string
+  - `AUTH_TRUST_HOST` = `true`
+- This repo also enables:
+  - Global HSTS headers to encourage HTTPS
+  - Middleware redirect from HTTP → HTTPS for protected routes
+  - Secure cookies via NextAuth when `NEXTAUTH_URL` uses HTTPS
+
 ### Manual Deployment
 ```bash
 # Build
