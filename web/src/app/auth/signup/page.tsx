@@ -11,9 +11,7 @@ export default function SignupPage() {
     email: '',
     password: '',
     confirmPassword: '',
-    name: '',
-    major: '',
-    year: ''
+    name: ''
   })
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
@@ -22,13 +20,6 @@ export default function SignupPage() {
   const [success, setSuccess] = useState(false)
   const router = useRouter()
 
-  const majors = [
-    'Computer Science', 'Data Science', 'Psychology', 'Business', 'Engineering',
-    'Biology', 'Chemistry', 'Physics', 'Mathematics', 'English', 'Music',
-    'Art', 'Economics', 'Political Science', 'Philosophy', 'History'
-  ]
-
-  const years = ['Freshman', 'Sophomore', 'Junior', 'Senior', 'Graduate']
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     setFormData(prev => ({
@@ -63,9 +54,7 @@ export default function SignupPage() {
         body: JSON.stringify({
           email: formData.email,
           password: formData.password,
-          name: formData.name,
-          major: formData.major,
-          year: formData.year
+          name: formData.name
         })
       })
 
@@ -125,65 +114,26 @@ export default function SignupPage() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900">Join the Club</h1>
             <p className="text-gray-600 mt-2">
-              Create your account to access music data and groups
+              Create your account to access music data and groups.<br />
+              <span className="text-sm text-gray-500">Your profile will be completed when you fill out our Google Form.</span>
             </p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
-                  Name
-                </label>
-                <input
-                  id="name"
-                  name="name"
-                  type="text"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  placeholder="Your name"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="year" className="block text-sm font-medium text-gray-700 mb-2">
-                  Year
-                </label>
-                <select
-                  id="year"
-                  name="year"
-                  value={formData.year}
-                  onChange={handleChange}
-                  required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
-                >
-                  <option value="">Select year</option>
-                  {years.map(year => (
-                    <option key={year} value={year}>{year}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-
             <div>
-              <label htmlFor="major" className="block text-sm font-medium text-gray-700 mb-2">
-                Major
+              <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-2">
+                Name
               </label>
-              <select
-                id="major"
-                name="major"
-                value={formData.major}
+              <input
+                id="name"
+                name="name"
+                type="text"
+                value={formData.name}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
-              >
-                <option value="">Select your major</option>
-                {majors.map(major => (
-                  <option key={major} value={major}>{major}</option>
-                ))}
-              </select>
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black"
+                placeholder="Your full name"
+              />
             </div>
 
             <div>
@@ -197,7 +147,7 @@ export default function SignupPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white text-black"
                 placeholder="your.email@university.edu"
               />
             </div>
@@ -215,7 +165,7 @@ export default function SignupPage() {
                   onChange={handleChange}
                   required
                   minLength={6}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-12"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-12 bg-white text-black"
                   placeholder="At least 6 characters"
                 />
                 <button
@@ -240,7 +190,7 @@ export default function SignupPage() {
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   required
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-12"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent pr-12 bg-white text-black"
                   placeholder="Confirm your password"
                 />
                 <button
