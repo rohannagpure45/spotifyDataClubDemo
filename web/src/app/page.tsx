@@ -206,7 +206,8 @@ export default function SpotifyDashboard() {
         throw new Error(data.error || 'Failed to process Google Forms data')
       }
 
-      setGroups(normalizeGroups(data.groups || []))
+      const normalized = normalizeGroups(data.groups || [])
+      setGroups(normalized)
       alert(`Processed ${data.summary?.totalResponses ?? normalized.reduce((s: number, g: any) => s + (g.members?.length || 0), 0)} responses into ${data.summary?.totalGroups ?? normalized.length} groups`)
     } catch (error) {
       console.error('Error importing from Google Sheets:', error)

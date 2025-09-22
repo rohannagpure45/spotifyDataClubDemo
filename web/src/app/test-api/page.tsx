@@ -16,7 +16,7 @@ export default function TestAPI() {
       }
 
       const data = await response.json()
-      setResults(prev => ({
+      setResults((prev: any) => ({
         ...prev,
         [name]: {
           status: 'success',
@@ -25,7 +25,7 @@ export default function TestAPI() {
         }
       }))
     } catch (error) {
-      setResults(prev => ({
+      setResults((prev: any) => ({
         ...prev,
         [name]: {
           status: 'error',

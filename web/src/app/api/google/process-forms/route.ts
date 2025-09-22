@@ -786,7 +786,7 @@ function generateMockResponses(count: number): any[] {
 
   const responses = []
   for (let i = 0; i < count; i++) {
-    const selectedGenres = []
+    const selectedGenres: string[] = []
     for (let j = 0; j < 3; j++) {
       const genre = genres[Math.floor(Math.random() * genres.length)]
       if (!selectedGenres.includes(genre)) {

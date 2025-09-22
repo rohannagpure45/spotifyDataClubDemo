@@ -51,8 +51,8 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     async jwt({ token, user }) {
       if (user) {
-        token.major = user.major
-        token.year = user.year
+        token.major = user.major ?? undefined
+        token.year = user.year ?? undefined
       }
       return token
     },
@@ -66,8 +66,7 @@ export const authOptions: NextAuthOptions = {
     }
   },
   pages: {
-    signIn: '/auth/login',
-    signUp: '/auth/signup'
+    signIn: '/auth/login'
   },
   secret: process.env.NEXTAUTH_SECRET || 'demo-secret-key'
 }
