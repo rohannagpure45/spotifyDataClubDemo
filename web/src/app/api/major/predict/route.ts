@@ -61,7 +61,8 @@ export async function POST(request: Request) {
     const byMajor = new Map<string, number[][]>()
     for (const row of submissions) {
       const major = row.user?.major
-      if (!major) continue
+      // Exclude placeholder majors that degrade predictions
+      if (!major || major === 'Undeclared' || major === 'Unknown') continue
       const f: Features = {
         energy: row.energy ?? 0.5,
         valence: row.valence ?? 0.5,
@@ -166,4 +167,3 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: false, error: 'Prediction failed' }, { status: 500 })
   }
 }
-

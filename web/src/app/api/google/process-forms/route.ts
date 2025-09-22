@@ -566,17 +566,20 @@ async function ensureUserExists(email: string, name?: string, major?: string, ye
       }
     })
   } else {
-    // User exists - update profile with form data if missing
-    const needsUpdate = (!user.major && major) || (!user.year && year) || (!user.name && name)
+    // User exists - update profile if current values are placeholders
+    const updates: Record<string, any> = {}
+    const isPlaceholderMajor = !user.major || user.major === 'Undeclared'
+    const isPlaceholderYear = !user.year || user.year === 'Unknown'
+    const isPlaceholderName = !user.name
 
-    if (needsUpdate) {
+    if (isPlaceholderName && name) updates.name = name
+    if (isPlaceholderMajor && major) updates.major = major
+    if (isPlaceholderYear && year) updates.year = year
+
+    if (Object.keys(updates).length > 0) {
       user = await prisma.user.update({
         where: { email },
-        data: {
-          name: user.name || name || user.name,
-          major: user.major || major,
-          year: user.year || year
-        }
+        data: updates
       })
     }
   }
