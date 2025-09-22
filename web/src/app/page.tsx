@@ -31,6 +31,25 @@ export default function SpotifyDashboard() {
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
   const [importingFromGoogle, setImportingFromGoogle] = useState(false)
   const [autoImport, setAutoImport] = useState(false)
+  const [autoRefreshSaved, setAutoRefreshSaved] = useState(false)
+
+  // Helper to normalize group objects for UI/Export compatibility
+  const normalizeGroups = (apiGroups: any[]) =>
+    (apiGroups || []).map((g: any, index: number) => ({
+      id: g.id || `group-${index + 1}`,
+      name: g.name || `Group ${index + 1}`,
+      members: (g.members || []).map((m: any) => ({
+        userId: m.userId || m.id || m.email || m.name,
+        username: m.username || m.name || m.email || 'Member',
+        major: m.major || 'Unknown',
+        topGenres: m.topGenres || m.musicProfile?.topGenres || [],
+        role: m.role || m.musicProfile?.listeningStyle || 'Member'
+      })),
+      compatibility: typeof g.compatibility === 'number' ? g.compatibility : (typeof g.groupCompatibility === 'number' ? g.groupCompatibility : 0.75),
+      playlistSuggestion: g.recommendations?.playlist || g.playlistSuggestion || '',
+      sharedInterests: g.sharedInterests || [],
+      meetingIdeas: g.meetingIdeas || []
+    }))
 
   const handleOpenModal = async (title: string, type: string) => {
     setLoading(true)
@@ -129,19 +148,7 @@ export default function SpotifyDashboard() {
         throw new Error(data.error || 'Failed to process Google Forms data')
       }
 
-      const normalized = (data.groups || []).map((g: any, index: number) => ({
-        id: g.id || `group-${index + 1}`,
-        name: g.name || `Group ${index + 1}`,
-        members: (g.members || []).map((m: any) => ({
-          userId: m.id || m.email || m.name,
-          username: m.name || m.email || 'Member',
-          major: m.major || 'Unknown'
-        })),
-        compatibility: typeof g.groupCompatibility === 'number' ? g.groupCompatibility : 0.75,
-        playlistSuggestion: g.recommendations?.playlist || ''
-      }))
-
-      setGroups(normalized)
+      setGroups(normalizeGroups(data.groups || []))
       alert(`Processed ${data.summary?.totalResponses ?? normalized.reduce((s: number, g: any) => s + (g.members?.length || 0), 0)} responses into ${data.summary?.totalGroups ?? normalized.length} groups`)
     } catch (error) {
       console.error('Error importing from Google Sheets:', error)
@@ -168,19 +175,7 @@ export default function SpotifyDashboard() {
         const data = await response.json()
         if (!response.ok) return
 
-        const normalized = (data.groups || []).map((g: any, index: number) => ({
-          id: g.id || `group-${index + 1}`,
-          name: g.name || `Group ${index + 1}`,
-          members: (g.members || []).map((m: any) => ({
-            userId: m.id || m.email || m.name,
-            username: m.name || m.email || 'Member',
-            major: m.major || 'Unknown'
-          })),
-          compatibility: typeof g.groupCompatibility === 'number' ? g.groupCompatibility : 0.75,
-          playlistSuggestion: g.recommendations?.playlist || ''
-        }))
-
-        setGroups(normalized)
+        setGroups(normalizeGroups(data.groups || []))
       } catch (e) {
         // Silently ignore background errors during auto-import
         console.debug('Auto-import error (ignored):', e)
@@ -189,6 +184,30 @@ export default function SpotifyDashboard() {
 
     return () => clearInterval(interval)
   }, [autoImport, googleSheetsUrl, groupSize])
+
+  // Auto-refresh saved groups by polling GET /api/groups every 10 seconds
+  useEffect(() => {
+    if (!autoRefreshSaved) return
+
+    let aborted = false
+
+    const fetchSaved = async () => {
+      try {
+        const resp = await fetch('/api/groups?limit=50')
+        if (!resp.ok) return
+        const payload = await resp.json()
+        if (aborted) return
+        setGroups(normalizeGroups(payload.groups || []))
+      } catch (e) {
+        console.debug('Auto-refresh fetch error (ignored):', e)
+      }
+    }
+
+    // initial fetch immediately
+    fetchSaved()
+    const interval = setInterval(fetchSaved, 10000) // 10 seconds
+    return () => { aborted = true; clearInterval(interval) }
+  }, [autoRefreshSaved])
 
   const handleExportToGoogle = async () => {
     if (groups.length === 0) {
@@ -503,6 +522,15 @@ export default function SpotifyDashboard() {
                               className="accent-[var(--spotify-green)]"
                             />
                             Auto-import every 60s (demo)
+                          </label>
+                          <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                            <input
+                              type="checkbox"
+                              checked={autoRefreshSaved}
+                              onChange={(e) => setAutoRefreshSaved(e.target.checked)}
+                              className="accent-[var(--accent-primary)]"
+                            />
+                            Auto-refresh saved groups every 10s
                           </label>
                         </div>
                         <div className="flex flex-col justify-between">
