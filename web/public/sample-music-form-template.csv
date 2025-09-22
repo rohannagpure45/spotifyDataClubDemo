@@ -1,0 +1,9 @@
+timestamp,name,email,major,year,genres,favorite_artists,energy,valence,danceability,acousticness,tempo
+2024-01-15T10:30:00Z,John Smith,john.smith@university.edu,Computer Science,Junior,"Pop, Electronic, Hip Hop","The Weeknd, Daft Punk, Drake",0.75,0.65,0.80,0.20,128
+2024-01-15T10:35:00Z,Emma Johnson,emma.j@university.edu,Psychology,Senior,"Indie, Alternative, Folk","Bon Iver, Phoebe Bridgers, The National",0.45,0.55,0.40,0.75,96
+2024-01-15T10:40:00Z,Michael Chen,m.chen@university.edu,Data Science,Sophomore,"Electronic, House, Techno","Calvin Harris, Deadmau5, Swedish House Mafia",0.85,0.70,0.90,0.10,130
+2024-01-15T10:45:00Z,Sarah Williams,sarah.w@university.edu,Music,Junior,"Jazz, Classical, R&B","Norah Jones, John Coltrane, H.E.R.",0.50,0.60,0.55,0.65,110
+2024-01-15T10:50:00Z,David Brown,david.b@university.edu,Business,Freshman,"Rock, Metal, Alternative","Metallica, Foo Fighters, Arctic Monkeys",0.80,0.45,0.60,0.35,140
+2024-01-15T10:55:00Z,Lisa Martinez,lisa.m@university.edu,Biology,Senior,"Pop, R&B, Soul","Beyoncé, SZA, Frank Ocean",0.65,0.70,0.75,0.25,115
+2024-01-15T11:00:00Z,James Wilson,james.w@university.edu,Engineering,Sophomore,"Hip Hop, Rap, Trap","Kendrick Lamar, Travis Scott, J. Cole",0.70,0.55,0.85,0.15,145
+2024-01-15T11:05:00Z,Amy Taylor,amy.t@university.edu,English,Junior,"Indie Pop, Dream Pop, Synthpop","Lorde, CHVRCHES, Beach House",0.55,0.65,0.60,0.45,118

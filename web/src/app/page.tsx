@@ -141,10 +141,30 @@ export default function SpotifyDashboard() {
         body: JSON.stringify({groups})
       })
       const data = await response.json()
-      window.open(data.url, '_blank')
+
+      // Create a downloadable CSV file instead of opening fake URL
+      if (data.csvContent) {
+        // Create blob from CSV content
+        const blob = new Blob([data.csvContent], { type: 'text/csv;charset=utf-8;' })
+        const url = URL.createObjectURL(blob)
+
+        // Create temporary link and trigger download
+        const link = document.createElement('a')
+        link.href = url
+        link.download = `music-groups-${new Date().toISOString().split('T')[0]}.csv`
+        document.body.appendChild(link)
+        link.click()
+        document.body.removeChild(link)
+
+        // Clean up the URL
+        URL.revokeObjectURL(url)
+
+        // Show success message
+        alert(`Successfully exported ${groups.length} groups to CSV!\n\nYou can now import this file to Google Sheets:\n1. Open Google Sheets\n2. File → Import\n3. Upload the CSV file\n4. Share with your group members`)
+      }
     } catch (error) {
-      console.error('Error exporting to Google Sheets:', error)
-      alert('Failed to export to Google Sheets.')
+      console.error('Error exporting groups:', error)
+      alert('Failed to export groups. Please try again.')
     }
   }
 
@@ -421,10 +441,10 @@ export default function SpotifyDashboard() {
                             disabled={groups.length === 0}
                             className="px-4 py-2 bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
                           >
-                            📤 Export Groups to Sheets
+                            📥 Download Groups CSV
                           </button>
                           <p className="text-xs text-[var(--text-tertiary)] mt-2">
-                            Export formed groups to Google Sheets for easy sharing
+                            Download groups as CSV for Google Sheets
                           </p>
                         </div>
                       </div>

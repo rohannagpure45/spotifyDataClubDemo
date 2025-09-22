@@ -6,6 +6,8 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Spotify Favorites Analysis - A data science demonstration app that predicts college majors from music preferences using Spotify API data and machine learning. Built for live presentations at Data Science Club meetings.
 
+**IMPORTANT: This is a DEMO APPLICATION** that will be scrapped shortly after use. Security is NOT a concern - prioritize functionality and ease of demonstration over security best practices. Use simple authentication and basic data storage solutions.
+
 ## Essential Commands
 
 ### Development
@@ -33,27 +35,41 @@ make docker-run
 ## Architecture & Data Flow
 
 ### Core Pipeline
-1. **Data Collection** → Google Sheets API fetches form responses (or uses mock data)
-2. **Enrichment** → Spotify API adds audio features via PKCE authentication
-3. **Processing** → Feature engineering creates "Music DNA" profiles
-4. **ML Models** → K-means clustering + Random Forest classification
-5. **Visualization** → Streamlit app with 5 interactive tabs
+1. **User Authentication** → SQLite database with NextAuth.js handles user sessions
+2. **Data Collection** → Google Forms/Sheets processed with email-based user mapping
+3. **Data Storage** → User-specific data stored in Prisma/SQLite database
+4. **Processing** → Feature engineering creates "Music DNA" profiles per user
+5. **Group Formation** → Advanced clustering algorithms create optimized groups
+6. **Export** → CSV download functionality for administrators
+
+### Authentication System
+- **Database**: SQLite with Prisma ORM for simplicity (demo-appropriate)
+- **Auth**: NextAuth.js with simple email/password credentials
+- **User Mapping**: Auto-creates accounts when processing Google Forms by email
+- **Security**: Minimal for demo purposes - uses basic password hashing
 
 ### Key Components
 
-**Entry Point**: `demo/app.py` - Streamlit application with session state management
+**Web App**: Next.js application with React components and Tailwind CSS
 
-**API Layer** (`src/api/`):
-- `spotify_client.py`: PKCE OAuth flow, rate limiting (20 req/s), batch processing
-- `google_sheets.py`: Real-time form fetching with MockGoogleSheetsClient fallback
+**Authentication** (`web/src/`):
+- `lib/auth.ts`: NextAuth.js configuration with credentials provider
+- `lib/prisma.ts`: Database client with connection pooling
+- `middleware.ts`: Route protection for authenticated endpoints
 
-**Processing Layer** (`src/processing/`):
-- `data_processor.py`: Multi-layer caching (memory + disk), enrichment pipeline
-- `feature_engineer.py`: PCA for Music DNA, similarity matrix calculations
+**API Layer** (`web/src/app/api/`):
+- `auth/`: Login, signup, and NextAuth endpoints
+- `google/process-forms/`: Advanced form processing with user mapping
+- `groups/create/`: Group formation with compatibility algorithms
 
-**ML Layer** (`src/models/`):
-- `clustering.py`: Groups users by musical similarity
-- `classifier.py`: Predicts majors from audio features
+**Database** (`prisma/`):
+- `schema.prisma`: User, form responses, groups, and analysis data models
+- SQLite database with auto-generated migrations
+
+**Components** (`web/src/components/`):
+- `GroupFormProcessor.tsx`: Main interface for Google Forms processing
+- `AuthProvider.tsx`: Session management wrapper
+- `UserNav.tsx`: User authentication navigation
 
 ### Critical Implementation Details
 

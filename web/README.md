@@ -1,15 +1,27 @@
-# 🎵 Spotify Music DNA Analysis - Web Dashboard
+# 🎵 Northeastern Data Club - Web Application
 
-A modern Next.js reimplementation of the Spotify Data Club Demo with improved UI/UX and Vercel deployment capabilities.
+A Next.js web application for processing Google Forms responses and creating optimized music-based groups with user authentication and data persistence.
 
 ## ✨ Features
 
-### 📊 **Interactive Dashboard**
-- **🎯 Live Feed** - Real-time response monitoring with celebration animations
-- **👥 Music Twin Finder** - AI-powered similarity matching to find your musical soulmate
-- **📊 Analysis** - 3D clustering visualizations, heatmaps, and statistical insights
-- **🎮 Major Guesser** - Interactive game where AI predicts your major from music taste
-- **🏆 Leaderboard** - Music awards and community stats
+### 🔐 **Authentication System**
+- **NextAuth.js** - Secure email/password authentication
+- **User Profiles** - Major, year, and music preference tracking
+- **Auto Account Creation** - Automatically creates accounts from Google Forms emails
+- **Session Management** - Persistent login with route protection
+
+### 📊 **Google Forms Integration**
+- **CSV Upload** - Process Google Forms exports directly
+- **Google Sheets URL** - Direct integration with live sheets
+- **Email Mapping** - Links form responses to user accounts by email
+- **Flexible Format** - Handles various question structures
+
+### 🤖 **Advanced Group Formation**
+- **Smart Algorithms** - Multi-factor compatibility scoring using cosine similarity
+- **Music Analysis** - Genre overlap, artist similarity, and audio feature matching
+- **Balanced Groups** - Considers diversity, cohesion, and member distribution
+- **Configurable Sizes** - Support for 2-8 person groups
+- **Intelligent Recommendations** - Playlist suggestions and activity ideas
 
 ### 🎨 **Modern UI/UX**
 - Beautiful gradient backgrounds (purple → blue → indigo)
@@ -19,14 +31,27 @@ A modern Next.js reimplementation of the Spotify Data Club Demo with improved UI
 - Professional typography and spacing
 - Smooth transitions and hover effects
 
+### 💾 **Data Persistence**
+- **SQLite Database** - Local file-based database for demo simplicity
+- **Prisma ORM** - Type-safe database operations with auto-generated client
+- **User-Scoped Data** - Each user only sees their own groups and submissions
+- **Form History** - Complete tracking of processed forms and responses
+
+### 📥 **Export & Analysis**
+- **CSV Download** - Complete group analysis with member details
+- **Compatibility Metrics** - Detailed scoring and explanations
+- **Activity Suggestions** - AI-generated recommendations for each group
+- **Meeting Planning** - Optimal times and locations based on preferences
+
 ### 🛠️ **Tech Stack**
 - **Framework**: Next.js 15 with App Router
 - **Language**: TypeScript
-- **Styling**: Tailwind CSS v4
+- **Database**: SQLite + Prisma ORM
+- **Authentication**: NextAuth.js
+- **Styling**: Tailwind CSS
 - **UI Components**: Radix UI primitives
 - **Icons**: Lucide React
-- **Charts**: Recharts (for future data visualization)
-- **Data Fetching**: SWR
+- **File Processing**: CSV parsing with email mapping
 - **Build Tool**: Turbopack (enabled)
 
 ## 🚀 Quick Start
@@ -35,6 +60,10 @@ A modern Next.js reimplementation of the Spotify Data Club Demo with improved UI
 ```bash
 # Install dependencies
 npm install
+
+# Setup database
+npx prisma generate
+npx prisma db push
 
 # Start development server
 npm run dev
