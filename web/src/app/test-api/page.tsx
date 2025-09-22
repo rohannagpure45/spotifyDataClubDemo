@@ -2,8 +2,13 @@
 
 import { useState } from 'react'
 
+type TestSuccess = { status: 'success'; dataKeys: string[]; itemCount: number | 'N/A' }
+type TestError = { status: 'error'; error: string }
+type TestResult = TestSuccess | TestError
+type ResultsMap = Record<string, TestResult>
+
 export default function TestAPI() {
-  const [results, setResults] = useState<any>({})
+  const [results, setResults] = useState<ResultsMap>({})
   const [loading, setLoading] = useState<string | null>(null)
 
   const testEndpoint = async (endpoint: string, name: string) => {
@@ -16,7 +21,7 @@ export default function TestAPI() {
       }
 
       const data = await response.json()
-      setResults((prev: any) => ({
+      setResults((prev) => ({
         ...prev,
         [name]: {
           status: 'success',
@@ -25,7 +30,7 @@ export default function TestAPI() {
         }
       }))
     } catch (error) {
-      setResults((prev: any) => ({
+      setResults((prev) => ({
         ...prev,
         [name]: {
           status: 'error',

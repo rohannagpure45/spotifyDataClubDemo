@@ -3,10 +3,18 @@
 import { useState } from 'react'
 import { Upload, Link, Users, Download, Loader2, CheckCircle, AlertCircle } from 'lucide-react'
 
+type ProcessedMember = {
+  userId?: string
+  username?: string
+  major?: string
+  topGenres?: string[]
+  role?: string
+}
+
 interface ProcessedGroup {
   id: string
   name: string
-  members: any[]
+  members: ProcessedMember[]
   groupCompatibility: number
   commonGenres: string[]
   groupDynamics: {

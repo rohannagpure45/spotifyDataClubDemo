@@ -79,25 +79,36 @@ function calculateSimilarity(profile1: number[], profile2: number[]): number {
 }
 
 // Process raw form responses into member profiles
-function processFormResponses(responses: any[]): ProcessedMember[] {
-  return responses.map((response, index) => {
+type FormRow = Record<string, unknown>
+
+function getStr(row: FormRow, key: string): string | undefined {
+  const v = row[key]
+  if (typeof v === 'string') return v
+  if (typeof v === 'number') return String(v)
+  return undefined
+}
+
+function processFormResponses(responses: unknown[]): ProcessedMember[] {
+  const rows: FormRow[] = Array.isArray(responses) ? (responses as FormRow[]) : []
+  return rows.map((response, index) => {
     // Extract music preferences from form data
     const preferenceVector = [
-      parseFloat(response.energy || '0.5'),
-      parseFloat(response.valence || '0.5'),
-      parseFloat(response.danceability || '0.5'),
-      parseFloat(response.acousticness || '0.5'),
-      parseFloat(response.tempo || '120') / 200, // Normalize tempo
-      response.genres ? response.genres.split(',').length / 10 : 0.3 // Genre diversity
+      parseFloat(getStr(response, 'energy') ?? '0.5'),
+      parseFloat(getStr(response, 'valence') ?? '0.5'),
+      parseFloat(getStr(response, 'danceability') ?? '0.5'),
+      parseFloat(getStr(response, 'acousticness') ?? '0.5'),
+      parseFloat(getStr(response, 'tempo') ?? '120') / 200, // Normalize tempo
+      getStr(response, 'genres') ? (getStr(response, 'genres')!.split(',').length / 10) : 0.3 // Genre diversity
     ]
 
     // Parse genres and artists
-    const genres = response.genres ?
-      response.genres.split(',').map((g: string) => g.trim()).filter(Boolean) :
+    const genres = getStr(response, 'genres') ?
+      getStr(response, 'genres')!.split(',').map((g: string) => g.trim()).filter(Boolean) :
       ['Pop', 'Rock']
 
-    const artists = response.favorite_artists ?
-      response.favorite_artists.split(',').map((a: string) => a.trim()).filter(Boolean) :
+    const favArtists = getStr(response, 'favorite_artists')
+    const artists = favArtists ?
+      favArtists.split(',').map((a: string) => a.trim()).filter(Boolean) :
       []
 
     // Determine listening style based on preferences
@@ -109,10 +120,10 @@ function processFormResponses(responses: any[]): ProcessedMember[] {
 
     return {
       id: `member-${index + 1}`,
-      name: response.name || `User ${index + 1}`,
-      email: response.email || `user${index + 1}@example.com`,
-      major: response.major || 'Undeclared',
-      year: response.year || 'Unknown',
+      name: getStr(response, 'name') || `User ${index + 1}`,
+      email: getStr(response, 'email') || `user${index + 1}@example.com`,
+      major: getStr(response, 'major') || 'Undeclared',
+      year: getStr(response, 'year') || 'Unknown',
       musicProfile: {
         topGenres: genres,
         topArtists: artists,
@@ -567,7 +578,7 @@ async function ensureUserExists(email: string, name?: string, major?: string, ye
     })
   } else {
     // User exists - update profile if current values are placeholders
-    const updates: Record<string, any> = {}
+    const updates: Partial<{ name: string; major: string; year: string }> = {}
     const isPlaceholderMajor = !user.major || user.major === 'Undeclared'
     const isPlaceholderYear = !user.year || user.year === 'Unknown'
     const isPlaceholderName = !user.name
@@ -604,7 +615,7 @@ export async function POST(request: Request) {
     const replace = String(formData.get('replace') || '').toLowerCase() === 'true'
     const replaceScope = String(formData.get('replaceScope') || 'user').toLowerCase() // 'user' | 'all'
 
-    let responses: any[] = []
+    let responses: unknown[] = []
 
     // Process file upload (CSV)
     if (file && file.size > 0) {
@@ -777,7 +788,7 @@ export async function POST(request: Request) {
 }
 
 // Generate mock responses for testing
-function generateMockResponses(count: number): any[] {
+function generateMockResponses(count: number): unknown[] {
   const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack']
   const majors = ['Computer Science', 'Psychology', 'Business', 'Engineering', 'Music', 'Biology']
   const years = ['Freshman', 'Sophomore', 'Junior', 'Senior']

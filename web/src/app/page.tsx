@@ -21,12 +21,75 @@ const getColorClass = (color: string, prefix: 'text' | 'bg' = 'text') => {
   return colorMap[color] || `${prefix}-[var(--accent-primary)]`
 }
 
+// Types for API/Modal data
+type UIGroupMember = {
+  userId: string
+  username: string
+  major: string
+  topGenres: string[]
+  role: string
+}
+
+type UIGroup = {
+  id: string
+  name: string
+  members: UIGroupMember[]
+  compatibility: number
+  playlistSuggestion?: string
+  sharedInterests?: string[]
+  meetingIdeas?: string[]
+}
+
+type PredictionTop = { major: string; probability: number }
+type PredictionResult = {
+  predictedMajor: string | null
+  top3: PredictionTop[]
+  datasetMajors: { major: string; samples: number }[]
+}
+
+type ClusterGroup = {
+  id: string
+  name: string
+  description: string
+  features: { energy: number; danceability: number; valence: number; acousticness: number }
+  members: number
+  topGenres: string[]
+}
+
+type ClustersApiResponse = { clusters: ClusterGroup[]; totalUsers: number; timestamp: string }
+
+type HeatmapMajorGenreData = {
+  type: 'major-genre'
+  majors: string[]
+  genres: string[]
+  matrix: number[][]
+  counts: number[][]
+  insights: string[]
+}
+
+type FeatureCorrelationData = {
+  type: 'feature-correlation'
+  features: string[]
+  matrix: number[][]
+  insights: string[]
+}
+
+type AudioMatchSharedFeature = { feature: string; yourValue: number; theirValue: number }
+type AudioMatchItem = { userId: string; username: string; similarity: number; matchReason: string; sharedFeatures: AudioMatchSharedFeature[] }
+type AudioMatchData = { matches: AudioMatchItem[] }
+
+type GenreMatchItem = { userId: string; username: string; similarity: number; sharedGenres: string[]; recommendation: string }
+type GenreMatchData = { matches: GenreMatchItem[] }
+
+type ModalType = 'clustering' | 'heatmap' | 'pca' | 'audioMatch' | 'genreMatch'
+type ModalContentState = { title: string; type: ModalType; data?: ClustersApiResponse | HeatmapMajorGenreData | FeatureCorrelationData | AudioMatchData | GenreMatchData | null }
+
 export default function SpotifyDashboard() {
   const { data: session } = useSession()
   const [liveResponses] = useState(42)
   const [modalOpen, setModalOpen] = useState(false)
-  const [modalContent, setModalContent] = useState<{title: string, type: string, data?: any}>({title: '', type: ''})
-  const [groups, setGroups] = useState<any[]>([])
+  const [modalContent, setModalContent] = useState<ModalContentState>({title: '', type: 'heatmap'})
+  const [groups, setGroups] = useState<UIGroup[]>([])
   const [showGroupFormation, setShowGroupFormation] = useState(false)
   const [loading, setLoading] = useState(false)
   const [groupSize, setGroupSize] = useState(4)
@@ -39,7 +102,7 @@ export default function SpotifyDashboard() {
   const [replaceExisting, setReplaceExisting] = useState(false)
   const [predictLoading, setPredictLoading] = useState(false)
   const [predictError, setPredictError] = useState<string | null>(null)
-  const [prediction, setPrediction] = useState<any | null>(null)
+  const [prediction, setPrediction] = useState<PredictionResult | null>(null)
   const [featureForm, setFeatureForm] = useState({
     energy: 0.65,
     valence: 0.5,
@@ -49,22 +112,43 @@ export default function SpotifyDashboard() {
   })
 
   // Helper to normalize group objects for UI/Export compatibility
-  const normalizeGroups = (apiGroups: any[]) =>
-    (apiGroups || []).map((g: any, index: number) => ({
-      id: g.id || `group-${index + 1}`,
-      name: g.name || `Group ${index + 1}`,
-      members: (g.members || []).map((m: any) => ({
-        userId: m.userId || m.id || m.email || m.name,
-        username: m.username || m.name || m.email || 'Member',
-        major: m.major || 'Unknown',
-        topGenres: m.topGenres || m.musicProfile?.topGenres || [],
-        role: m.role || m.musicProfile?.listeningStyle || 'Member'
-      })),
-      compatibility: typeof g.compatibility === 'number' ? g.compatibility : (typeof g.groupCompatibility === 'number' ? g.groupCompatibility : 0.75),
-      playlistSuggestion: g.recommendations?.playlist || g.playlistSuggestion || '',
-      sharedInterests: g.sharedInterests || [],
-      meetingIdeas: g.meetingIdeas || []
-    }))
+  const normalizeGroups = (apiGroups: unknown[]): UIGroup[] =>
+    (Array.isArray(apiGroups) ? apiGroups : []).map((g, index: number): UIGroup => {
+      const obj = (g ?? {}) as Record<string, unknown>
+      const membersRaw = Array.isArray(obj.members) ? obj.members : []
+      const members: UIGroupMember[] = membersRaw.map((m): UIGroupMember => {
+        const mm = (m ?? {}) as Record<string, unknown>
+        const mp = (mm.musicProfile as Record<string, unknown> | undefined) || undefined
+        const userId = typeof mm.userId === 'string' ? mm.userId
+          : typeof mm.id === 'string' ? mm.id
+          : typeof mm.email === 'string' ? mm.email
+          : typeof mm.name === 'string' ? mm.name
+          : 'member'
+        const username = typeof mm.username === 'string' ? mm.username
+          : typeof mm.name === 'string' ? mm.name
+          : typeof mm.email === 'string' ? mm.email
+          : 'Member'
+        const major = typeof mm.major === 'string' ? mm.major : 'Unknown'
+        const topGenres = Array.isArray(mm.topGenres) ? (mm.topGenres as string[])
+          : Array.isArray(mp?.topGenres) ? (mp!.topGenres as string[]) : []
+        const role = (typeof mm.role === 'string' ? mm.role
+          : typeof mp?.listeningStyle === 'string' ? String(mp!.listeningStyle)
+          : 'Member')
+        return { userId, username, major, topGenres, role }
+      })
+      const compatibility = typeof obj.compatibility === 'number'
+        ? obj.compatibility as number
+        : (typeof obj.groupCompatibility === 'number' ? (obj.groupCompatibility as number) : 0.75)
+      const name = typeof obj.name === 'string' ? obj.name : `Group ${index + 1}`
+      const id = typeof obj.id === 'string' ? obj.id : `group-${index + 1}`
+      const rec = (obj.recommendations as Record<string, unknown> | undefined) || undefined
+      const playlistSuggestion = typeof rec?.playlist === 'string'
+        ? (rec!.playlist as string)
+        : (typeof obj.playlistSuggestion === 'string' ? obj.playlistSuggestion as string : '')
+      const sharedInterests = Array.isArray(obj.sharedInterests) ? (obj.sharedInterests as string[]) : []
+      const meetingIdeas = Array.isArray(obj.meetingIdeas) ? (obj.meetingIdeas as string[]) : []
+      return { id, name, members, compatibility, playlistSuggestion, sharedInterests, meetingIdeas }
+    })
 
   const refreshSavedGroups = async () => {
     try {
@@ -208,7 +292,7 @@ export default function SpotifyDashboard() {
 
       const normalized = normalizeGroups(data.groups || [])
       setGroups(normalized)
-      alert(`Processed ${data.summary?.totalResponses ?? normalized.reduce((s: number, g: any) => s + (g.members?.length || 0), 0)} responses into ${data.summary?.totalGroups ?? normalized.length} groups`)
+      alert(`Processed ${data.summary?.totalResponses ?? normalized.reduce((s: number, g: UIGroup) => s + (g.members?.length || 0), 0)} responses into ${data.summary?.totalGroups ?? normalized.length} groups`)
     } catch (error) {
       console.error('Error importing from Google Sheets:', error)
       alert('Failed to import from Google Sheets. Please check the URL and permissions.')
@@ -701,7 +785,7 @@ export default function SpotifyDashboard() {
                         </div>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {groups.map((group: any, index: number) => (
+                        {groups.map((group: UIGroup, index: number) => (
                           <div key={group.id} className="p-4 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] hover:border-[var(--spotify-green)]/30 transition-all duration-200">
                             <div className="flex items-start justify-between mb-3">
                               <div>
@@ -728,7 +812,7 @@ export default function SpotifyDashboard() {
                               </div>
                             </div>
                             <div className="space-y-2 mb-3">
-                              {group.members.map((member: any, memberIndex: number) => (
+                              {group.members.map((member: UIGroupMember, memberIndex: number) => (
                                 <div key={member.userId} className="flex items-center gap-2">
                                   <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center text-xs text-white font-bold">
                                     {member.username.charAt(0).toUpperCase()}
@@ -1071,7 +1155,7 @@ export default function SpotifyDashboard() {
                         <div className="mt-2">
                           <div className="text-xs text-[var(--text-tertiary)] mb-1">Top 3 majors</div>
                           <div className="space-y-2">
-                            {prediction.top3.map((p: any) => (
+                            {prediction.top3.map((p: PredictionTop) => (
                               <div key={p.major} className="flex items-center justify-between">
                                 <span className="text-sm text-[var(--text-secondary)]">{p.major}</span>
                                 <span className="text-sm font-medium text-[var(--accent-success)]">{Math.round(p.probability * 100)}%</span>
@@ -1080,7 +1164,7 @@ export default function SpotifyDashboard() {
                           </div>
                         </div>
                         <div className="mt-4 text-xs text-[var(--text-tertiary)]">
-                          Trained on {prediction.datasetMajors.reduce((s: number, m: any) => s + m.samples, 0)} samples across {prediction.datasetMajors.length} majors.
+                          Trained on {prediction.datasetMajors.reduce((s: number, m: { samples: number }) => s + m.samples, 0)} samples across {prediction.datasetMajors.length} majors.
                         </div>
                       </div>
                     ) : (
@@ -1378,7 +1462,7 @@ export default function SpotifyDashboard() {
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Musical Neighborhood Clusters</h3>
                   <div className="grid grid-cols-2 gap-4">
-                    {modalContent.data.clusters?.map((cluster: any, index: number) => {
+                        { (modalContent.data as ClustersApiResponse | undefined)?.clusters?.map((cluster: ClusterGroup, index: number) => {
                       const colors = ['accent-secondary', 'accent-primary', 'spotify-green', 'accent-warning']
                       const color = colors[index % colors.length]
                       const energyWidth = Math.round(cluster.features.energy * 100)
@@ -1527,7 +1611,7 @@ export default function SpotifyDashboard() {
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Your Audio Feature Compatibility</h3>
                   <div className="space-y-4">
-                    {modalContent.data.matches?.map((match: any) => (
+                    {(modalContent.data as AudioMatchData | undefined)?.matches?.map((match: AudioMatchItem) => (
                       <div key={match.userId} className="p-4 rounded-lg bg-[var(--surface-tertiary)] border border-[var(--border-primary)]">
                         <div className="flex items-center justify-between mb-2">
                           <span className="font-medium text-[var(--text-primary)]">{match.username}</span>
@@ -1535,7 +1619,7 @@ export default function SpotifyDashboard() {
                         </div>
                         <p className="text-xs text-[var(--text-tertiary)] mb-3">{match.matchReason}</p>
                         <div className="space-y-2 text-sm">
-                          {match.sharedFeatures.slice(0, 3).map((feature: any) => (
+                          {match.sharedFeatures.slice(0, 3).map((feature: AudioMatchSharedFeature) => (
                             <div key={feature.feature} className="flex justify-between">
                               <span className="text-[var(--text-secondary)]">{feature.feature}</span>
                               <div className="flex items-center gap-2">
@@ -1556,7 +1640,7 @@ export default function SpotifyDashboard() {
                 <div>
                   <h3 className="text-lg font-semibold text-[var(--text-primary)] mb-4">Genre Similarity Network</h3>
                   <div className="space-y-4">
-                    {modalContent.data.matches?.map((match: any) => (
+                    {(modalContent.data as GenreMatchData | undefined)?.matches?.map((match: GenreMatchItem) => (
                       <div key={match.userId} className="p-4 rounded-lg bg-[var(--surface-tertiary)] border border-[var(--border-primary)]">
                         <div className="flex items-center justify-between mb-3">
                           <span className="font-medium text-[var(--text-primary)]">{match.username}</span>

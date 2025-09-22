@@ -37,10 +37,10 @@ function isPlaceholder(value: string | null | undefined, placeholders: string[])
   return placeholders.includes(value)
 }
 
-function getCaseInsensitive<T extends object>(obj: any, key: string): any {
+function getCaseInsensitive(obj: Record<string, unknown> | null | undefined, key: string): unknown {
   if (!obj) return undefined
   const found = Object.keys(obj).find(k => k.toLowerCase() === key.toLowerCase())
-  return found ? (obj as any)[found] : undefined
+  return found ? obj[found] : undefined
 }
 
 export async function GET() {
@@ -84,10 +84,10 @@ export async function POST() {
     })
     if (!latestForm) continue
 
-    const form = parseJSONSafe<Record<string, any>>(latestForm.formData)
+    const form = parseJSONSafe<Record<string, unknown>>(latestForm.formData)
     if (!form) continue
 
-    const updates: Record<string, any> = {}
+    const updates: Partial<{ name: string; major: string; year: string }> = {}
     const name = getCaseInsensitive(form, 'name')
     const major = getCaseInsensitive(form, 'major')
     const year = getCaseInsensitive(form, 'year')

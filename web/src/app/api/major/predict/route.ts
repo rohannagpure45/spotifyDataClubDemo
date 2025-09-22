@@ -133,7 +133,8 @@ export async function POST(request: Request) {
         tempo: Number(rawFeatures?.tempo ?? NaN),
       }
       // Validate minimal fields
-      const valid = ['energy', 'valence', 'danceability', 'acousticness', 'tempo'].every(k => Number.isFinite((f as any)[k]))
+      const keys: (keyof Features)[] = ['energy', 'valence', 'danceability', 'acousticness', 'tempo']
+      const valid = keys.every(k => Number.isFinite(Number(f[k])))
       if (!valid) {
         return NextResponse.json({ success: false, error: 'Missing or invalid feature values.' }, { status: 400 })
       }

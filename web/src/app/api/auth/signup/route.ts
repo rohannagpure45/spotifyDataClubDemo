@@ -6,9 +6,9 @@ export async function POST(request: Request) {
   try {
     const { email, password, name, major, year } = await request.json()
 
-    if (!email || !password) {
+    if (!email || !password || !name) {
       return NextResponse.json(
-        { error: 'Email and password are required' },
+        { error: 'Email, password, and name are required' },
         { status: 400 }
       )
     }
@@ -42,14 +42,14 @@ export async function POST(request: Request) {
         }
       })
     } else {
-      // Create new user
+      // Create new user (major and year will be populated from Google Forms)
       user = await prisma.user.create({
         data: {
           email,
           password: hashedPassword,
           name,
-          major,
-          year,
+          major: major || null,
+          year: year || null,
           autoCreated: false
         }
       })

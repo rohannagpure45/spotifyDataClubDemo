@@ -17,7 +17,8 @@ interface MusicGroup {
 }
 
 // Helper function to generate more diverse groups
-function generateAdditionalMembers(count: number, startId: number): any[] {
+type Member = MusicGroup['members'][number]
+function generateAdditionalMembers(count: number, startId: number): Member[] {
   const majors = ['Data Science', 'Mathematics', 'Physics', 'Chemistry', 'Biology', 'Philosophy', 'Economics', 'Political Science', 'Art History', 'Theater', 'Dance', 'Architecture']
   const firstNames = ['Oliver', 'Sophia', 'Liam', 'Isabella', 'Noah', 'Mia', 'Ethan', 'Ava', 'Lucas', 'Charlotte', 'Mason', 'Amelia']
   const lastNames = ['Smith', 'Johnson', 'Williams', 'Brown', 'Jones', 'Garcia', 'Miller', 'Davis', 'Rodriguez', 'Martinez', 'Hernandez', 'Lopez']
@@ -35,7 +36,7 @@ function generateAdditionalMembers(count: number, startId: number): any[] {
   ]
   const roles = ['Music Explorer', 'Rhythm Keeper', 'Harmony Seeker', 'Genre Mixer', 'Tempo Setter', 'Mood Matcher']
 
-  const members = []
+  const members: Member[] = []
   for (let i = 0; i < count; i++) {
     const id = startId + i
     members.push({

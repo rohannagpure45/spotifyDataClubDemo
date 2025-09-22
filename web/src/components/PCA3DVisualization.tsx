@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic'
 import { useEffect, useState } from 'react'
+import type { Layout, Config, Data } from 'plotly.js'
 
 // Dynamically import Plotly to avoid SSR issues
 const Plot = dynamic(() => import('react-plotly.js'), {
@@ -38,7 +39,7 @@ interface PCA3DVisualizationProps {
 }
 
 export default function PCA3DVisualization({ data }: PCA3DVisualizationProps) {
-  const [plotData, setPlotData] = useState<any>(null)
+  const [plotData, setPlotData] = useState<{ data: Data[]; layout: Partial<Layout>; config: Partial<Config> } | null>(null)
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {

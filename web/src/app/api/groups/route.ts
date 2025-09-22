@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import type { Prisma } from '@prisma/client'
 
 export async function GET(request: Request) {
   try {
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
     const includeCsv = searchParams.get('includeCsv') === 'true'
     const publicScope = searchParams.get('public') === 'true'
 
-    const where: any = publicScope ? {} : { userId: session.user.id }
+    const where: Prisma.GroupWhereInput = publicScope ? {} : { userId: session.user.id }
     if (sinceParam) {
       const sinceDate = new Date(sinceParam)
       if (!isNaN(sinceDate.getTime())) {
@@ -34,15 +35,35 @@ export async function GET(request: Request) {
       take: limit
     })
 
-    const sanitizeMembers = (members: any[]) =>
-      (members || []).map((m) => ({
-        // Remove email or any extra PII from public view
-        userId: m.userId || m.id || undefined,
-        name: m.username || m.name || 'Member',
-        major: m.major || 'Unknown',
-        topGenres: m.topGenres || m.musicProfile?.topGenres || [],
-        listeningStyle: m.musicProfile?.listeningStyle || m.role || undefined
-      }))
+    type PublicMember = {
+      userId?: string
+      name: string
+      major: string
+      topGenres: string[]
+      listeningStyle?: string
+    }
+
+    const sanitizeMembers = (members: unknown[]): PublicMember[] =>
+      (Array.isArray(members) ? members : []).map((m) => {
+        const obj = m as Record<string, unknown>
+        const musicProfile = (obj.musicProfile as Record<string, unknown> | undefined) || undefined
+        const userId = typeof obj.userId === 'string' ? obj.userId
+          : typeof obj.id === 'string' ? obj.id
+          : undefined
+        const name = typeof obj.username === 'string' ? obj.username
+          : typeof obj.name === 'string' ? obj.name
+          : 'Member'
+        const major = typeof obj.major === 'string' ? obj.major : 'Unknown'
+        const topGenres = Array.isArray((obj.topGenres as unknown))
+          ? (obj.topGenres as string[])
+          : Array.isArray((musicProfile?.topGenres as unknown))
+            ? (musicProfile!.topGenres as string[])
+            : []
+        const listeningStyle = typeof (musicProfile?.listeningStyle) === 'string'
+          ? String(musicProfile!.listeningStyle)
+          : (typeof obj.role === 'string' ? obj.role : undefined)
+        return { userId, name, major, topGenres, listeningStyle }
+      })
 
     const groups = rows.map((g) => ({
       id: g.id,
