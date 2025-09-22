@@ -30,6 +30,15 @@ export default function SnakeGame() {
   const onKey = useCallback((e: KeyboardEvent) => {
     if (!active) return
     const k = e.key.toLowerCase()
+    // Space: restart instantly if game over
+    if (k === ' ' || k === 'space' || k === 'spacebar') {
+      e.preventDefault()
+      if (gameOver) {
+        start()
+      }
+      return
+    }
+    // Prevent page scroll with arrow keys
     if (k.startsWith('arrow')) e.preventDefault()
     if (!running || gameOver) return
     if ((k === 'arrowup' || k === 'w') && dir.y !== 1) setDir({ x: 0, y: -1 })
