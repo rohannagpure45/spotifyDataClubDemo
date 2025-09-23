@@ -90,6 +90,72 @@ const getDemoTrainingData = (): Map<string, number[][]> => {
   return demoData
 }
 
+// Calculate prediction accuracy from historical predictions
+async function calculateAccuracy(): Promise<{ accuracy: number; totalPredictions: number }> {
+  try {
+    const analysisResults = await prisma.analysisResult.findMany({
+      where: {
+        analysisType: 'major-predict'
+      },
+      include: {
+        user: {
+          select: {
+            major: true
+          }
+        }
+      }
+    })
+
+    if (analysisResults.length === 0) {
+      return { accuracy: 0, totalPredictions: 0 }
+    }
+
+    let correct = 0
+    let total = 0
+
+    for (const result of analysisResults) {
+      try {
+        const data = JSON.parse(result.data)
+        const predictedMajor = data.predictedMajor
+        const actualMajor = result.user.major
+
+        // Only count predictions where we have both predicted and actual major
+        if (predictedMajor && actualMajor && actualMajor !== 'Undeclared' && actualMajor !== 'Unknown') {
+          total++
+          if (predictedMajor === actualMajor) {
+            correct++
+          }
+        }
+      } catch {
+        // Skip invalid JSON data
+        continue
+      }
+    }
+
+    const accuracy = total > 0 ? (correct / total) * 100 : 0
+    return { accuracy: Math.round(accuracy * 10) / 10, totalPredictions: total }
+  } catch (error) {
+    console.error('Error calculating accuracy:', error)
+    return { accuracy: 0, totalPredictions: 0 }
+  }
+}
+
+export async function GET() {
+  try {
+    const { accuracy, totalPredictions } = await calculateAccuracy()
+    return NextResponse.json({
+      accuracy,
+      totalPredictions
+    })
+  } catch (error) {
+    console.error('Error getting prediction stats:', error)
+    return NextResponse.json(
+      { error: 'Failed to get prediction statistics' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)

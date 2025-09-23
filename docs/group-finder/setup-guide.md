@@ -72,6 +72,79 @@ source venv/bin/activate
 streamlit run demo/app.py
 ```
 
+## Google Forms Data Mapping
+
+### Required Form Fields
+
+For the application to work properly with Google Forms data, your form must include these exact field names (case-sensitive):
+
+#### **Essential Fields (Required)**
+- `email` - Respondent's email address (required for user mapping)
+- `name` - Full name of the respondent
+- `major` - Academic major or field of study
+- `year` - Year in school (e.g., "Freshman", "Sophomore", "Junior", "Senior")
+- `favorite_song` - Their favorite song title
+- `favorite_artists` - Comma-separated list of favorite artists
+
+#### **Music Preference Fields (Required)**
+- `genres` - Comma-separated list of music genres they enjoy
+
+#### **Audio Feature Fields (Optional but Recommended)**
+- `energy` - Energy level preference (0-1 scale, where 1 = high energy)
+- `valence` - Happiness/positivity preference (0-1 scale, where 1 = very positive)
+- `danceability` - Danceability preference (0-1 scale, where 1 = very danceable)
+- `acousticness` - Acoustic vs electronic preference (0-1 scale, where 1 = very acoustic)
+- `tempo` - Preferred tempo in BPM (beats per minute)
+
+### Google Form Setup Example
+
+#### Form Questions:
+1. **Email Address** → `email`
+2. **Full Name** → `name`
+3. **Academic Major** → `major`
+4. **Year in School** → `year`
+5. **Favorite Song** → `favorite_song`
+6. **Favorite Artists** (separate with commas) → `favorite_artists`
+7. **Music Genres You Enjoy** (separate with commas) → `genres`
+
+#### Optional Advanced Questions:
+8. **Energy Level** (0 = calm, 1 = high energy) → `energy`
+9. **Positivity** (0 = melancholic, 1 = upbeat) → `valence`
+10. **Danceability** (0 = not danceable, 1 = very danceable) → `danceability`
+11. **Acoustic Preference** (0 = electronic, 1 = acoustic) → `acousticness`
+12. **Preferred Tempo** (BPM, e.g., 120) → `tempo`
+
+### CSV Column Headers
+
+When exporting from Google Forms to CSV, ensure these exact column headers:
+
+```csv
+email,name,major,year,favorite_song,favorite_artists,genres,energy,valence,danceability,acousticness,tempo
+john@example.com,John Doe,Computer Science,Junior,Bohemian Rhapsody,Queen,Rock,0.8,0.7,0.6,0.3,120
+```
+
+### Data Processing Flow
+
+1. **User Creation**: System auto-creates user accounts based on email addresses
+2. **Data Validation**: Required fields are validated during import
+3. **Music Submissions**: Songs and preferences are stored in the database
+4. **Real-time Updates**: All statistics and displays update automatically
+5. **Group Formation**: Advanced algorithms use the data for compatibility matching
+
+### Troubleshooting Common Issues
+
+#### Missing Data
+- **Problem**: "No submissions yet" shown on dashboard
+- **Solution**: Ensure CSV has proper column headers and valid email addresses
+
+#### Invalid Audio Features
+- **Problem**: Audio features not processing correctly
+- **Solution**: Ensure audio feature values are between 0 and 1 (decimal format)
+
+#### User Mapping Issues
+- **Problem**: Users not being created properly
+- **Solution**: Check that email column exists and contains valid email addresses
+
 ## Configuration Options
 
 ### 1. Group Size Parameters

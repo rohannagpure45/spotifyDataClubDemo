@@ -5,18 +5,39 @@ A data science project that analyzes the musical preferences of our community by
 
 ## 📊 Data Collection
 
-### Survey Form
-We'll collect data through a simple form asking participants:
-- **Music Preferences**
-  - What's your favorite song?
-  - Who's your favorite artist?
-  
-- **Demographics** 
-  - Hometown/Region
-  - Age
-  - Academic Major
-  - Year in School
-  - *[Additional questions to be determined]*
+### Google Forms Setup Requirements
+
+For proper integration with the web application, your Google Form must include specific field names:
+
+#### **Required Fields**
+- `email` - Respondent email (enables automatic user account creation)
+- `name` - Full name
+- `major` - Academic major or field of study
+- `year` - Year in school (Freshman, Sophomore, Junior, Senior)
+- `favorite_song` - Favorite song title
+- `favorite_artists` - Comma-separated list of favorite artists
+- `genres` - Comma-separated list of music genres
+
+#### **Optional Audio Features** (Enhances AI predictions)
+- `energy` - Energy level preference (0-1 scale)
+- `valence` - Happiness/positivity preference (0-1 scale)
+- `danceability` - Danceability preference (0-1 scale)
+- `acousticness` - Acoustic vs electronic preference (0-1 scale)
+- `tempo` - Preferred tempo in BPM
+
+### Data Processing Flow
+1. **Google Forms** → Export to CSV or connect via URL
+2. **Upload/Import** → Automatic processing via web interface
+3. **User Creation** → Auto-generates accounts by email
+4. **Real-time Updates** → Dashboard displays live statistics
+5. **Group Formation** → AI-powered compatibility matching
+
+### CSV Format Example
+```csv
+email,name,major,year,favorite_song,favorite_artists,genres,energy,valence,danceability,acousticness,tempo
+john@university.edu,John Doe,Computer Science,Junior,Bohemian Rhapsody,Queen,Rock,0.8,0.7,0.6,0.3,120
+jane@university.edu,Jane Smith,Psychology,Senior,Good 4 U,Olivia Rodrigo,Pop,0.9,0.8,0.9,0.2,140
+```
 
 ## 🔬 Analysis Pipeline
 

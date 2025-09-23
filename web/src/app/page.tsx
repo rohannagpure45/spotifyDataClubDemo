@@ -85,7 +85,34 @@ type ModalContentState = { title: string; type: ModalType; data?: ClustersApiRes
 
 
 export default function SpotifyDashboard() {
-  const [liveResponses] = useState(42)
+  // Dynamic data states
+  const [liveResponses, setLiveResponses] = useState(0)
+  const [stats, setStats] = useState<{
+    totalSubmissions: number
+    uniqueArtists: number
+    topArtist: { name: string; count: number } | null
+    topGenre: { name: string; percentage: number } | null
+    averages: { energy: number; valence: number; danceability: number; tempo: number }
+    extremes: {
+      mostEnergetic: { song: string; artist: string; energy: number; user: string } | null
+      happiest: { song: string; artist: string; valence: number; user: string } | null
+      mostDanceable: { song: string; artist: string; danceability: number; user: string } | null
+    }
+  }>({
+    totalSubmissions: 0,
+    uniqueArtists: 0,
+    topArtist: null,
+    topGenre: null,
+    averages: { energy: 0, valence: 0, danceability: 0, tempo: 0 },
+    extremes: { mostEnergetic: null, happiest: null, mostDanceable: null }
+  })
+  const [liveFeed, setLiveFeed] = useState<{
+    recentSubmissions: Array<{ name: string; song: string; artist: string; major: string; timeAgo: string }>
+    activityRate: number
+  }>({ recentSubmissions: [], activityRate: 0 })
+  const [predictionAccuracy, setPredictionAccuracy] = useState<{ accuracy: number; totalPredictions: number }>({ accuracy: 0, totalPredictions: 0 })
+
+  // UI states
   const [modalOpen, setModalOpen] = useState(false)
   const [modalContent, setModalContent] = useState<ModalContentState>({title: '', type: 'heatmap'})
   const [groups, setGroups] = useState<UIGroup[]>([])
@@ -446,6 +473,72 @@ export default function SpotifyDashboard() {
     }
   }
 
+  // Data fetching functions
+  const fetchStats = async () => {
+    try {
+      const response = await fetch('/api/stats')
+      if (response.ok) {
+        const data = await response.json()
+        setStats(data)
+        setLiveResponses(data.totalSubmissions)
+      }
+    } catch (error) {
+      console.error('Error fetching stats:', error)
+    }
+  }
+
+  const fetchLiveFeed = async () => {
+    try {
+      const response = await fetch('/api/live-feed')
+      if (response.ok) {
+        const data = await response.json()
+        setLiveFeed(data)
+      }
+    } catch (error) {
+      console.error('Error fetching live feed:', error)
+    }
+  }
+
+  const fetchPredictionAccuracy = async () => {
+    try {
+      const response = await fetch('/api/major/predict')
+      if (response.ok) {
+        const data = await response.json()
+        setPredictionAccuracy(data)
+      }
+    } catch (error) {
+      console.error('Error fetching prediction accuracy:', error)
+    }
+  }
+
+  // Load initial data and set up auto-refresh
+  useEffect(() => {
+    fetchStats()
+    fetchLiveFeed()
+    fetchPredictionAccuracy()
+
+    // Auto-refresh every 30 seconds
+    const interval = setInterval(() => {
+      fetchStats()
+      fetchLiveFeed()
+      fetchPredictionAccuracy()
+    }, 30000)
+
+    return () => clearInterval(interval)
+  }, [])
+
+  // Refresh data when Google Forms are processed
+  useEffect(() => {
+    if (!importingFromGoogle) {
+      // Refresh data after Google Forms import
+      setTimeout(() => {
+        fetchStats()
+        fetchLiveFeed()
+        fetchPredictionAccuracy()
+      }, 1000)
+    }
+  }, [importingFromGoogle])
+
   return (
     <div className="min-h-screen bg-[var(--background)] text-[var(--text-primary)]">
       {/* Header */}
@@ -525,9 +618,16 @@ export default function SpotifyDashboard() {
                   <CardDescription className="text-[var(--text-secondary)]">Different artists mentioned</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="text-4xl font-bold text-[var(--accent-primary)] group-hover:scale-105 transition-transform">28</div>
+                  <div className="text-4xl font-bold text-[var(--accent-primary)] group-hover:scale-105 transition-transform">
+                    {stats.uniqueArtists}
+                  </div>
                   <p className="text-sm text-[var(--text-tertiary)] mt-2">
-                    <span className="text-[var(--text-secondary)]">Taylor Swift</span> leads with 6 mentions
+                    {stats.topArtist ? (
+                      <span className="text-[var(--text-secondary)]">{stats.topArtist.name}</span>
+                    ) : (
+                      <span className="text-[var(--text-secondary)]">No data yet</span>
+                    )}
+                    {stats.topArtist && ` leads with ${stats.topArtist.count} mention${stats.topArtist.count !== 1 ? 's' : ''}`}
                   </p>
                 </CardContent>
               </Card>
@@ -559,12 +659,7 @@ export default function SpotifyDashboard() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-3">
-                  {[
-                    { name: "Alex", song: "Anti-Hero", artist: "Taylor Swift", major: "Computer Science", time: "2s ago" },
-                    { name: "Sarah", song: "As It Was", artist: "Harry Styles", major: "Psychology", time: "15s ago" },
-                    { name: "Mike", song: "Unholy", artist: "Sam Smith", major: "Business", time: "32s ago" },
-                    { name: "Emma", song: "Flowers", artist: "Miley Cyrus", major: "Art", time: "45s ago" },
-                  ].map((entry, index) => (
+                  {liveFeed.recentSubmissions.length > 0 ? liveFeed.recentSubmissions.slice(0, 4).map((entry, index) => (
                     <div key={index} className="flex items-center justify-between p-4 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] hover:bg-[var(--surface-elevated)] transition-all duration-200 group">
                       <div className="flex-1">
                         <div className="font-medium text-[var(--text-primary)] group-hover:text-[var(--spotify-green)] transition-colors">
@@ -575,10 +670,16 @@ export default function SpotifyDashboard() {
                         </div>
                       </div>
                       <div className="text-xs text-[var(--text-tertiary)] bg-[var(--surface-secondary)] px-2 py-1 rounded-md">
-                        {entry.time}
+                        {entry.timeAgo}
                       </div>
                     </div>
-                  ))}
+                  )) : (
+                    <div className="text-center py-8 text-[var(--text-secondary)]">
+                      <div className="text-2xl mb-2">🎵</div>
+                      <p>No submissions yet</p>
+                      <p className="text-sm text-[var(--text-tertiary)] mt-1">Responses will appear here as they come in</p>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
@@ -982,11 +1083,15 @@ export default function SpotifyDashboard() {
                     <div className="space-y-3">
                       <div className="flex items-center justify-between py-2">
                         <span className="text-sm text-[var(--text-secondary)]">Sample size</span>
-                        <span className="text-sm font-medium text-[var(--text-primary)]">42 responses</span>
+                        <span className="text-sm font-medium text-[var(--text-primary)]">
+                          {stats.totalSubmissions} response{stats.totalSubmissions !== 1 ? 's' : ''}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between py-2">
                         <span className="text-sm text-[var(--text-secondary)]">Model accuracy</span>
-                        <span className="text-sm font-medium text-[var(--accent-success)]">73.2%</span>
+                        <span className="text-sm font-medium text-[var(--accent-success)]">
+                          {predictionAccuracy.totalPredictions > 0 ? `${predictionAccuracy.accuracy}%` : 'N/A'}
+                        </span>
                       </div>
                       <div className="flex items-center justify-between py-2">
                         <span className="text-sm text-[var(--text-secondary)]">Last updated</span>
@@ -1182,10 +1287,19 @@ export default function SpotifyDashboard() {
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-baseline gap-2">
-                        <div className="text-3xl font-bold text-[var(--accent-warning)]">73.2%</div>
-                        <span className="text-sm text-[var(--accent-success)]">+2.1%</span>
+                        <div className="text-3xl font-bold text-[var(--accent-warning)]">
+                          {predictionAccuracy.totalPredictions > 0 ? `${predictionAccuracy.accuracy}%` : 'N/A'}
+                        </div>
+                        {predictionAccuracy.totalPredictions > 0 && (
+                          <span className="text-sm text-[var(--accent-success)]">Live</span>
+                        )}
                       </div>
-                      <p className="text-sm text-[var(--text-secondary)]">Accuracy based on 42 responses</p>
+                      <p className="text-sm text-[var(--text-secondary)]">
+                        {predictionAccuracy.totalPredictions > 0
+                          ? `Accuracy based on ${predictionAccuracy.totalPredictions} prediction${predictionAccuracy.totalPredictions !== 1 ? 's' : ''}`
+                          : 'No predictions yet'
+                        }
+                      </p>
                       <div className="mt-4 space-y-2">
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-[var(--text-tertiary)]">Precision</span>
@@ -1313,11 +1427,23 @@ export default function SpotifyDashboard() {
                         <h4 className="font-bold text-[var(--accent-warning)] text-lg mb-1">🔥 Most Energetic</h4>
                         <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent-warning)] to-transparent my-2"></div>
                       </div>
-                      <p className="font-semibold text-[var(--text-primary)] mb-1">&quot;HUMBLE.&quot; by Kendrick Lamar</p>
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="px-2 py-1 rounded-md bg-[var(--accent-warning)]/10 text-xs font-medium text-[var(--accent-warning)]">Energy: 0.89</div>
-                      </div>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">Submitted by Alex - CS Major</p>
+                      {stats.extremes.mostEnergetic ? (
+                        <>
+                          <p className="font-semibold text-[var(--text-primary)] mb-1">
+                            &quot;{stats.extremes.mostEnergetic.song}&quot; by {stats.extremes.mostEnergetic.artist}
+                          </p>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="px-2 py-1 rounded-md bg-[var(--accent-warning)]/10 text-xs font-medium text-[var(--accent-warning)]">
+                              Energy: {stats.extremes.mostEnergetic.energy?.toFixed(2)}
+                            </div>
+                          </div>
+                          <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                            Submitted by {stats.extremes.mostEnergetic.user}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[var(--text-secondary)] text-center">No submissions yet</p>
+                      )}
                     </div>
                   </div>
 
@@ -1330,11 +1456,23 @@ export default function SpotifyDashboard() {
                         <h4 className="font-bold text-[var(--accent-success)] text-lg mb-1">😊 Happiest Song</h4>
                         <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent-success)] to-transparent my-2"></div>
                       </div>
-                      <p className="font-semibold text-[var(--text-primary)] mb-1">&quot;Good as Hell&quot; by Lizzo</p>
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="px-2 py-1 rounded-md bg-[var(--accent-success)]/10 text-xs font-medium text-[var(--accent-success)]">Valence: 0.95</div>
-                      </div>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">Submitted by Emma - Psychology</p>
+                      {stats.extremes.happiest ? (
+                        <>
+                          <p className="font-semibold text-[var(--text-primary)] mb-1">
+                            &quot;{stats.extremes.happiest.song}&quot; by {stats.extremes.happiest.artist}
+                          </p>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="px-2 py-1 rounded-md bg-[var(--accent-success)]/10 text-xs font-medium text-[var(--accent-success)]">
+                              Valence: {stats.extremes.happiest.valence?.toFixed(2)}
+                            </div>
+                          </div>
+                          <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                            Submitted by {stats.extremes.happiest.user}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[var(--text-secondary)] text-center">No submissions yet</p>
+                      )}
                     </div>
                   </div>
 
@@ -1347,11 +1485,23 @@ export default function SpotifyDashboard() {
                         <h4 className="font-bold text-[var(--accent-secondary)] text-lg mb-1">💃 Most Danceable</h4>
                         <div className="h-px bg-gradient-to-r from-transparent via-[var(--accent-secondary)] to-transparent my-2"></div>
                       </div>
-                      <p className="font-semibold text-[var(--text-primary)] mb-1">&quot;Levitating&quot; by Dua Lipa</p>
-                      <div className="flex items-center justify-center gap-2">
-                        <div className="px-2 py-1 rounded-md bg-[var(--accent-secondary)]/10 text-xs font-medium text-[var(--accent-secondary)]">Danceability: 0.88</div>
-                      </div>
-                      <p className="text-xs text-[var(--text-tertiary)] mt-2">Submitted by Sarah - Business</p>
+                      {stats.extremes.mostDanceable ? (
+                        <>
+                          <p className="font-semibold text-[var(--text-primary)] mb-1">
+                            &quot;{stats.extremes.mostDanceable.song}&quot; by {stats.extremes.mostDanceable.artist}
+                          </p>
+                          <div className="flex items-center justify-center gap-2">
+                            <div className="px-2 py-1 rounded-md bg-[var(--accent-secondary)]/10 text-xs font-medium text-[var(--accent-secondary)]">
+                              Danceability: {stats.extremes.mostDanceable.danceability?.toFixed(2)}
+                            </div>
+                          </div>
+                          <p className="text-xs text-[var(--text-tertiary)] mt-2">
+                            Submitted by {stats.extremes.mostDanceable.user}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[var(--text-secondary)] text-center">No submissions yet</p>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -1360,16 +1510,47 @@ export default function SpotifyDashboard() {
                   <div className="flex items-center gap-3 mb-4">
                     <h4 className="text-xl font-bold text-[var(--text-primary)]">Community Statistics</h4>
                     <div className="flex-1 h-px bg-gradient-to-r from-[var(--border-primary)] to-transparent"></div>
-                    <div className="text-xs text-[var(--text-tertiary)] bg-[var(--surface-tertiary)] px-2 py-1 rounded-md">42 submissions</div>
+                    <div className="text-xs text-[var(--text-tertiary)] bg-[var(--surface-tertiary)] px-2 py-1 rounded-md">
+                      {stats.totalSubmissions} submission{stats.totalSubmissions !== 1 ? 's' : ''}
+                    </div>
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[
-                      { label: "Average Energy", value: "0.67", description: "We like moderately energetic music", color: "accent-error", percentage: 67 },
-                      { label: "Average Valence", value: "0.58", description: "Slightly more positive than negative", color: "accent-success", percentage: 58 },
-                      { label: "Average Danceability", value: "0.72", description: "Our music is quite danceable!", color: "accent-secondary", percentage: 72 },
-                      { label: "Most Common Tempo", value: "120 BPM", description: "Perfect for jogging and workouts", color: "accent-warning", percentage: 100 },
-                    ].map((stat, index) => (
+                    {stats.totalSubmissions > 0 ? [
+                      {
+                        label: "Average Energy",
+                        value: stats.averages.energy.toFixed(2),
+                        description: stats.averages.energy > 0.7 ? "High energy community!" : stats.averages.energy > 0.4 ? "Moderate energy preferences" : "Calm music preferences",
+                        color: "accent-error",
+                        percentage: Math.round(stats.averages.energy * 100)
+                      },
+                      {
+                        label: "Average Valence",
+                        value: stats.averages.valence.toFixed(2),
+                        description: stats.averages.valence > 0.6 ? "Generally positive vibes" : stats.averages.valence > 0.4 ? "Balanced emotional range" : "Melancholic preferences",
+                        color: "accent-success",
+                        percentage: Math.round(stats.averages.valence * 100)
+                      },
+                      {
+                        label: "Average Danceability",
+                        value: stats.averages.danceability.toFixed(2),
+                        description: stats.averages.danceability > 0.7 ? "Very danceable community!" : stats.averages.danceability > 0.5 ? "Moderately danceable" : "Prefer non-dance music",
+                        color: "accent-secondary",
+                        percentage: Math.round(stats.averages.danceability * 100)
+                      },
+                      {
+                        label: "Average Tempo",
+                        value: `${Math.round(stats.averages.tempo)} BPM`,
+                        description: stats.averages.tempo > 130 ? "Fast-paced music lovers" : stats.averages.tempo > 100 ? "Moderate tempo preferences" : "Slower, relaxed music",
+                        color: "accent-warning",
+                        percentage: Math.min(100, Math.round((stats.averages.tempo / 180) * 100))
+                      },
+                    ] : [
+                      { label: "Average Energy", value: "N/A", description: "No data available", color: "accent-error", percentage: 0 },
+                      { label: "Average Valence", value: "N/A", description: "No data available", color: "accent-success", percentage: 0 },
+                      { label: "Average Danceability", value: "N/A", description: "No data available", color: "accent-secondary", percentage: 0 },
+                      { label: "Average Tempo", value: "N/A", description: "No data available", color: "accent-warning", percentage: 0 },
+                    ]).map((stat, index) => (
                       <div key={index} className="p-4 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] hover:bg-[var(--surface-elevated)] transition-all duration-300 group">
                         <div className="flex items-center justify-between mb-3">
                           <div className="flex-1">

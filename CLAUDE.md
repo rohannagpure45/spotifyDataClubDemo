@@ -129,12 +129,65 @@ pylint src/
 - Docker health check endpoint: `/_stcore/health`
 - Session state persists across tab switches but not page refreshes
 
+## Dynamic Data Architecture
+
+### Data Flow Overview
+
+The application now uses **100% dynamic data** from the database, with no hardcoded mock values:
+
+1. **Google Forms** → Process endpoint → Database storage
+2. **Database** → Statistics APIs → Frontend display
+3. **Real-time updates** every 30 seconds
+4. **Empty states** when no data exists
+
+### Key Database Tables
+
+- **User**: Auto-created from form emails with authentication
+- **MusicSubmission**: Stores songs with audio features (energy, valence, etc.)
+- **Group**: Optimized group formations with compatibility scores
+- **AnalysisResult**: Predictions and analysis cache for accuracy tracking
+
+### API Endpoints (All Dynamic)
+
+#### Statistics APIs
+- `/api/stats` - Real-time statistics (total submissions, unique artists, top artist/genre, averages, extremes)
+- `/api/live-feed` - Recent submissions with timestamps and activity rate
+- `/api/major/predict` - GET: accuracy metrics, POST: actual predictions
+
+#### Twin Finder APIs (Updated)
+- `/api/twins/audio-match` - Real similarity calculations using database
+- `/api/twins/genre-match` - Real genre overlap calculations
+
+### Frontend Data Loading
+
+- **Initial Load**: All APIs called on page mount
+- **Auto-refresh**: Every 30 seconds for live updates
+- **Post-import Refresh**: After Google Forms processing
+- **Empty States**: Graceful handling when no data exists
+
+### Real-time Features
+
+- Live response count updates
+- Recent submissions with "time ago" formatting
+- Dynamic leaderboards (most energetic, happiest, most danceable songs)
+- Calculated community averages (energy, valence, danceability, tempo)
+- Prediction accuracy from historical data
+
+### Google Forms Integration
+
+- Field mapping documented in setup guide
+- Auto-user creation by email
+- Validation of required vs optional fields
+- Real-time dashboard updates after processing
+
 ## Key Files Reference
 
-- Main app: `demo/app.py`
-- Config: `.streamlit/config.toml` (dark theme settings)
-- Dependencies: `requirements.txt` (note: black==24.10.0, not 24.12.1)
-- Implementation plan: `plan.md` (1176 lines of detailed specifications)
+- **Frontend**: `web/src/app/page.tsx` (fully dynamic UI)
+- **APIs**: `web/src/app/api/stats/route.ts`, `web/src/app/api/live-feed/route.ts`
+- **Database**: `web/prisma/schema.prisma` (User, MusicSubmission, Group, AnalysisResult)
+- **Documentation**: `docs/group-finder/setup-guide.md`, `README.md`
+- **Legacy**: `demo/app.py` (old Streamlit app)
+- **Config**: `.streamlit/config.toml` (dark theme settings)
 
 ## Important Guidelines
 
@@ -143,3 +196,11 @@ pylint src/
 - Distinguish between working UI elements and actual functionality
 - Note when APIs return errors or mock data
 - Be honest about limitations and unknowns
+
+### Dynamic Data Validation
+
+When testing the application:
+- Check that statistics change when new data is added
+- Verify empty states show "No data yet" when database is empty
+- Confirm live feed updates with real submissions
+- Test that Google Forms processing triggers UI updates
