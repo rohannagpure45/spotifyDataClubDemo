@@ -67,10 +67,10 @@ export default function SignupPage() {
 
       setSuccess(true)
 
-      // Auto sign in after successful signup
+      // Auto sign in after successful signup using actual stored email
       setTimeout(async () => {
         const result = await signIn('credentials', {
-          email: formData.email,
+          email: data.user.email, // Use email returned from API (handles demo email modifications)
           password: formData.password,
           redirect: false
         })
