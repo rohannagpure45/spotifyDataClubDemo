@@ -28,9 +28,7 @@ export const config = {
   matcher: [
     '/forms-processor',
     '/api/google/process-forms',
-    '/api/groups/create',
     '/api/groups',
-    '/api/major/predict',
     '/api/admin/:path*'
   ]
 }

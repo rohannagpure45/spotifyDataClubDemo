@@ -135,3 +135,11 @@ pylint src/
 - Config: `.streamlit/config.toml` (dark theme settings)
 - Dependencies: `requirements.txt` (note: black==24.10.0, not 24.12.1)
 - Implementation plan: `plan.md` (1176 lines of detailed specifications)
+
+## Important Guidelines
+
+**NEVER claim something as fact unless you are 100% certain.** Always be precise about what was actually observed vs. what is assumed. When testing or analyzing:
+- Report exactly what was seen/tested
+- Distinguish between working UI elements and actual functionality
+- Note when APIs return errors or mock data
+- Be honest about limitations and unknowns

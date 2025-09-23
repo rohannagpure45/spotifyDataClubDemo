@@ -35,51 +35,105 @@ function cosine(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom
 }
 
+// Demo training data for when no real data is available
+const getDemoTrainingData = (): Map<string, number[][]> => {
+  const demoData = new Map<string, number[][]>()
+
+  // Computer Science - High energy, moderate valence, electronic music
+  demoData.set('Computer Science', [
+    toVector({ energy: 0.8, valence: 0.6, danceability: 0.7, acousticness: 0.2, tempo: 128 }),
+    toVector({ energy: 0.85, valence: 0.55, danceability: 0.75, acousticness: 0.15, tempo: 140 }),
+    toVector({ energy: 0.9, valence: 0.65, danceability: 0.8, acousticness: 0.1, tempo: 135 }),
+    toVector({ energy: 0.75, valence: 0.7, danceability: 0.6, acousticness: 0.25, tempo: 120 })
+  ])
+
+  // Psychology - Moderate energy, high valence, indie/alternative
+  demoData.set('Psychology', [
+    toVector({ energy: 0.6, valence: 0.8, danceability: 0.5, acousticness: 0.4, tempo: 110 }),
+    toVector({ energy: 0.65, valence: 0.85, danceability: 0.55, acousticness: 0.35, tempo: 115 }),
+    toVector({ energy: 0.7, valence: 0.75, danceability: 0.6, acousticness: 0.3, tempo: 105 }),
+    toVector({ energy: 0.55, valence: 0.9, danceability: 0.45, acousticness: 0.5, tempo: 100 })
+  ])
+
+  // Business - Moderate everything, mainstream preferences
+  demoData.set('Business', [
+    toVector({ energy: 0.7, valence: 0.7, danceability: 0.7, acousticness: 0.3, tempo: 125 }),
+    toVector({ energy: 0.75, valence: 0.65, danceability: 0.75, acousticness: 0.25, tempo: 130 }),
+    toVector({ energy: 0.65, valence: 0.75, danceability: 0.65, acousticness: 0.35, tempo: 120 }),
+    toVector({ energy: 0.8, valence: 0.6, danceability: 0.8, acousticness: 0.2, tempo: 128 })
+  ])
+
+  // English Literature - Lower energy, high valence, acoustic preferences
+  demoData.set('English Literature', [
+    toVector({ energy: 0.4, valence: 0.8, danceability: 0.4, acousticness: 0.7, tempo: 95 }),
+    toVector({ energy: 0.45, valence: 0.85, danceability: 0.35, acousticness: 0.75, tempo: 90 }),
+    toVector({ energy: 0.35, valence: 0.9, danceability: 0.3, acousticness: 0.8, tempo: 85 }),
+    toVector({ energy: 0.5, valence: 0.75, danceability: 0.45, acousticness: 0.65, tempo: 100 })
+  ])
+
+  // Engineering - High energy, moderate valence, rock/metal
+  demoData.set('Engineering', [
+    toVector({ energy: 0.9, valence: 0.5, danceability: 0.6, acousticness: 0.1, tempo: 145 }),
+    toVector({ energy: 0.95, valence: 0.45, danceability: 0.55, acousticness: 0.05, tempo: 150 }),
+    toVector({ energy: 0.85, valence: 0.55, danceability: 0.65, acousticness: 0.15, tempo: 140 }),
+    toVector({ energy: 0.9, valence: 0.4, danceability: 0.5, acousticness: 0.1, tempo: 155 })
+  ])
+
+  // Biology - Moderate energy, high valence, nature-inspired
+  demoData.set('Biology', [
+    toVector({ energy: 0.6, valence: 0.85, danceability: 0.5, acousticness: 0.6, tempo: 108 }),
+    toVector({ energy: 0.55, valence: 0.9, danceability: 0.45, acousticness: 0.65, tempo: 102 }),
+    toVector({ energy: 0.65, valence: 0.8, danceability: 0.55, acousticness: 0.55, tempo: 112 }),
+    toVector({ energy: 0.7, valence: 0.75, danceability: 0.6, acousticness: 0.5, tempo: 115 })
+  ])
+
+  return demoData
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
-      return NextResponse.json({ success: false, error: 'Authentication required' }, { status: 401 })
-    }
+    const userId = session?.user?.id
+    const isAuthenticated = !!userId
 
-    const userId = session.user.id
-
-    // Only allow if we can correlate to the user's form answers
-    const formCount = await prisma.formResponse.count({ where: { userId } })
-    if (formCount === 0) {
-      return NextResponse.json({
-        success: false,
-        error: 'No form responses found for your account. Please process Google Form responses first so we can correlate predictions with your data.'
-      }, { status: 400 })
+    // Check if user has form responses (only for authenticated users)
+    let hasFormResponses = false
+    if (isAuthenticated) {
+      const formCount = await prisma.formResponse.count({ where: { userId } })
+      hasFormResponses = formCount > 0
     }
 
     const body = await request.json().catch(() => ({})) as { features?: Partial<Features>; useLatest?: boolean }
     const { features: rawFeatures, useLatest } = body || {}
 
-    // Build training centroids per major from existing submissions
-    const submissions = await prisma.musicSubmission.findMany({ include: { user: true } })
-    const byMajor = new Map<string, number[][]>()
-    for (const row of submissions) {
-      const major = row.user?.major
-      // Exclude placeholder majors that degrade predictions
-      if (!major || major === 'Undeclared' || major === 'Unknown') continue
-      const f: Features = {
-        energy: row.energy ?? 0.5,
-        valence: row.valence ?? 0.5,
-        danceability: row.danceability ?? 0.5,
-        acousticness: row.acousticness ?? 0.5,
-        tempo: row.tempo ?? 120,
+    // Build training centroids per major from existing submissions or use demo data
+    let byMajor = new Map<string, number[][]>()
+    let usingDemoData = false
+
+    if (isAuthenticated && hasFormResponses) {
+      // Try to use real data for authenticated users with form responses
+      const submissions = await prisma.musicSubmission.findMany({ include: { user: true } })
+      for (const row of submissions) {
+        const major = row.user?.major
+        // Exclude placeholder majors that degrade predictions
+        if (!major || major === 'Undeclared' || major === 'Unknown') continue
+        const f: Features = {
+          energy: row.energy ?? 0.5,
+          valence: row.valence ?? 0.5,
+          danceability: row.danceability ?? 0.5,
+          acousticness: row.acousticness ?? 0.5,
+          tempo: row.tempo ?? 120,
+        }
+        const vec = toVector(f)
+        if (!byMajor.has(major)) byMajor.set(major, [])
+        byMajor.get(major)!.push(vec)
       }
-      const vec = toVector(f)
-      if (!byMajor.has(major)) byMajor.set(major, [])
-      byMajor.get(major)!.push(vec)
     }
 
+    // Fallback to demo data if insufficient real data or unauthenticated user
     if (byMajor.size < 2) {
-      return NextResponse.json({
-        success: false,
-        error: 'Insufficient training data across majors. Please process more form responses to enable predictions.'
-      }, { status: 400 })
+      byMajor = getDemoTrainingData()
+      usingDemoData = true
     }
 
     // Compute centroids
@@ -108,12 +162,21 @@ export async function POST(request: Request) {
     let inputUsed: Features | null = null
 
     if (useLatest) {
+      if (!isAuthenticated) {
+        return NextResponse.json({
+          success: false,
+          error: 'Please log in to use your latest submission, or enter features manually.'
+        }, { status: 400 })
+      }
       const latest = await prisma.musicSubmission.findFirst({
         where: { userId },
         orderBy: { createdAt: 'desc' }
       })
       if (!latest) {
-        return NextResponse.json({ success: false, error: 'No saved music submission found for your account.' }, { status: 400 })
+        return NextResponse.json({
+          success: false,
+          error: 'No saved music submission found for your account. Try entering features manually.'
+        }, { status: 400 })
       }
       const f: Features = {
         energy: latest.energy ?? 0.5,
@@ -162,17 +225,21 @@ export async function POST(request: Request) {
       method: 'centroid-cosine',
       datasetMajors: centroids.map(c => ({ major: c.major, samples: c.n })),
       usedMajors: filteredCentroids.map(c => ({ major: c.major, samples: c.n })),
+      usingDemoData,
+      authenticated: isAuthenticated
     }
 
-    // Persist analysis result for user history
-    await prisma.analysisResult.create({
-      data: {
-        userId,
-        analysisType: 'major-predict',
-        data: JSON.stringify(result),
-        parameters: JSON.stringify({ method: 'centroid-cosine', featureDim: inputVec.length })
-      }
-    })
+    // Persist analysis result for user history (only for authenticated users)
+    if (isAuthenticated && userId) {
+      await prisma.analysisResult.create({
+        data: {
+          userId,
+          analysisType: 'major-predict',
+          data: JSON.stringify(result),
+          parameters: JSON.stringify({ method: 'centroid-cosine', featureDim: inputVec.length })
+        }
+      })
+    }
 
     return NextResponse.json({ success: true, ...result })
   } catch (error) {
