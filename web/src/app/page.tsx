@@ -1516,7 +1516,7 @@ export default function SpotifyDashboard() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {stats.totalSubmissions > 0 ? [
+                    {(stats.totalSubmissions > 0 ? [
                       {
                         label: "Average Energy",
                         value: stats.averages.energy.toFixed(2),
