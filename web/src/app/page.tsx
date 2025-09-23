@@ -120,6 +120,8 @@ export default function SpotifyDashboard() {
   const [loading, setLoading] = useState(false)
   const [groupSize, setGroupSize] = useState(4)
   const [isFormingGroups, setIsFormingGroups] = useState(false)
+  const [useDemoGroups, setUseDemoGroups] = useState(false)
+  const [replaceFormGroups, setReplaceFormGroups] = useState(false)
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
   const [importingFromGoogle, setImportingFromGoogle] = useState(false)
   const [autoImport, setAutoImport] = useState(false)
@@ -282,7 +284,7 @@ export default function SpotifyDashboard() {
       const response = await fetch('/api/groups/create', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({groupSize: groupSize})
+        body: JSON.stringify({ groupSize: groupSize, demo: useDemoGroups, replace: replaceFormGroups })
       })
       const data = await response.json()
       setGroups(data.groups)
@@ -779,16 +781,36 @@ export default function SpotifyDashboard() {
                         </div>
                       </div>
 
-                      <div className="flex gap-2">
-                        <button
-                          onClick={handleFormGroups}
-                          disabled={isFormingGroups}
-                          className="px-6 py-3 bg-gradient-to-r from-[var(--spotify-green)] to-[var(--accent-primary)] text-white font-semibold rounded-xl hover:scale-105 transition-transform duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
-                        >
-                          {isFormingGroups ? 'Forming...' : 'Form Groups'}
-                        </button>
-                      </div>
+                    <div className="flex gap-2">
+                      <button
+                        onClick={handleFormGroups}
+                        disabled={isFormingGroups}
+                        className="px-6 py-3 bg-gradient-to-r from-[var(--spotify-green)] to-[var(--accent-primary)] text-white font-semibold rounded-xl hover:scale-105 transition-transform duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        {isFormingGroups ? 'Forming...' : 'Form Groups'}
+                      </button>
                     </div>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                      <input
+                        type="checkbox"
+                        checked={useDemoGroups}
+                        onChange={(e) => setUseDemoGroups(e.target.checked)}
+                        className="accent-[var(--accent-primary)]"
+                      />
+                      Use demo data (no submissions)
+                    </label>
+                    <label className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
+                      <input
+                        type="checkbox"
+                        checked={replaceFormGroups}
+                        onChange={(e) => setReplaceFormGroups(e.target.checked)}
+                        className="accent-[var(--accent-primary)]"
+                      />
+                      Replace my saved groups
+                    </label>
+                  </div>
 
                     {/* Google Integration */}
                     <div className="p-4 rounded-lg bg-[var(--surface-tertiary)]/50 border border-[var(--border-primary)]">

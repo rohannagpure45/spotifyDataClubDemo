@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
+import { calculateCompatibilities as calcCompat, formOptimizedGroups as formGroups, generateCSV as genCSV } from '@/lib/music-utils'
 
 // (Removed unused FormResponse interface to satisfy lint)
 
@@ -647,8 +648,8 @@ export async function POST(request: Request) {
     // Process the responses
     const members = processFormResponses(responses)
 
-    // Calculate compatibilities
-    calculateCompatibilities(members)
+    // Calculate compatibilities (shared util)
+    calcCompat(members)
 
     // Create users for all email addresses in responses and store form data
     for (const response of responses as FormRow[]) {
@@ -703,8 +704,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Form optimized groups
-    const groups = formOptimizedGroups(members, groupSize)
+    // Form optimized groups (shared util)
+    const groups = formGroups(members, groupSize)
 
     // Replace existing groups if requested (demo mode)
     if (replace) {
@@ -730,7 +731,7 @@ export async function POST(request: Request) {
     }
 
     // Generate CSV
-    const csvContent = generateCSV(groups)
+    const csvContent = genCSV(groups)
 
     // Create summary statistics
     const summary = {
@@ -824,7 +825,7 @@ export async function GET(request: Request) {
 
   try {
     const groups = JSON.parse(decodeURIComponent(groupData))
-    const csvContent = generateCSV(groups)
+    const csvContent = genCSV(groups)
 
     return new Response(csvContent, {
       headers: {
