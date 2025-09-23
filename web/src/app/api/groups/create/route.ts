@@ -24,58 +24,64 @@ export async function POST(request: Request) {
     const replace = Boolean(body.replace)
     const demo = Boolean(body.demo || body.generateDemo)
 
-    // Load real users with music submissions
-    const usersWithMusic = await prisma.user.findMany({
-      where: { submissions: { some: {} } },
-      include: { submissions: true }
-    })
-
     let members: ProcessedMember[] = []
-    if (usersWithMusic.length > 0) {
-      members = buildMembersFromUsers(usersWithMusic)
-    } else if (demo) {
-      // Provide demo members if explicitly requested
+
+    if (demo) {
+      // Demo mode: skip DB reads entirely
       members = generateDemoMembers(20)
     } else {
-      return NextResponse.json({
-        success: false,
-        error: 'No users with music submissions found. Import data via Google Sheets or submit music first.',
-        hint: 'Re-run with { demo: true } to generate demo groups.'
-      }, { status: 400 })
+      // Load real users with music submissions
+      const usersWithMusic = await prisma.user.findMany({
+        where: { submissions: { some: {} } },
+        include: { submissions: true }
+      })
+
+      if (usersWithMusic.length > 0) {
+        members = buildMembersFromUsers(usersWithMusic)
+      } else {
+        return NextResponse.json({
+          success: false,
+          error: 'No users with music submissions found. Import data via Google Sheets or submit music first.',
+          hint: 'Use the demo toggle to generate example groups.'
+        }, { status: 400 })
+      }
     }
 
     // Compute compatibilities and form groups
     calculateCompatibilities(members)
     const groups = formOptimizedGroups(members, groupSize)
 
-    // Optionally replace existing groups for this user
-    if (replace) {
-      await prisma.group.deleteMany({ where: { userId: session.user.id } })
-    }
-
-    // Persist groups
-    for (const g of groups) {
-      // Serialize member info suitable for public display
-      const serializedMembers = g.members.map(m => ({
-        userId: m.userId || m.id,
-        name: m.name,
-        major: m.major,
-        musicProfile: {
-          topGenres: m.musicProfile.topGenres,
-          listeningStyle: m.musicProfile.listeningStyle
+    // Optionally persist groups (skip if demo and DB not configured)
+    if (!demo || replace) {
+      try {
+        if (replace) {
+          await prisma.group.deleteMany({ where: { userId: session.user.id } })
         }
-      }))
-
-      await prisma.group.create({
-        data: {
-          userId: session.user.id,
-          name: demo ? `${g.name} (Demo)` : g.name,
-          members: JSON.stringify(serializedMembers),
-          compatibility: g.groupCompatibility,
-          commonGenres: JSON.stringify(g.commonGenres),
-          recommendations: JSON.stringify(g.recommendations)
+        for (const g of groups) {
+          const serializedMembers = g.members.map(m => ({
+            userId: m.userId || m.id,
+            name: m.name,
+            major: m.major,
+            musicProfile: {
+              topGenres: m.musicProfile.topGenres,
+              listeningStyle: m.musicProfile.listeningStyle
+            }
+          }))
+          await prisma.group.create({
+            data: {
+              userId: session.user.id,
+              name: demo ? `${g.name} (Demo)` : g.name,
+              members: JSON.stringify(serializedMembers),
+              compatibility: g.groupCompatibility,
+              commonGenres: JSON.stringify(g.commonGenres),
+              recommendations: JSON.stringify(g.recommendations)
+            }
+          })
         }
-      })
+      } catch (e) {
+        // Ignore persistence errors in demo mode; surface errors otherwise
+        if (!demo) throw e
+      }
     }
 
     // Prepare response payload similar to Google Forms processing
