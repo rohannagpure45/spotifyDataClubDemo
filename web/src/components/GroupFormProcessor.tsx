@@ -94,7 +94,7 @@ export default function GroupFormProcessor() {
       setFilePreview(preview)
       setError(null)
       setShowPreview(true)
-    } catch (err) {
+    } catch {
       setError('Failed to read CSV file')
     }
   }

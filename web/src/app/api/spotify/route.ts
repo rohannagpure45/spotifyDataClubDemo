@@ -1,13 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextResponse } from 'next/server';
 
-export async function GET(request: NextRequest) {
+export async function GET() {
   return NextResponse.json({
     success: false,
     error: 'Spotify integration not implemented. Use CSV/Forms data.'
   }, { status: 501 });
 }
 
-export async function POST(request: NextRequest) {
+export async function POST() {
   return NextResponse.json({
     success: false,
     error: 'Spotify integration not implemented. Use CSV/Forms data.'

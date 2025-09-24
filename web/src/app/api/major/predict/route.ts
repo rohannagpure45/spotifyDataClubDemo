@@ -119,8 +119,7 @@ export async function POST(request: Request) {
     const { features: rawFeatures, useLatest } = body || {}
 
     // Build training centroids per major from existing submissions
-    let byMajor = new Map<string, number[][]>()
-    let usingDemoData = false
+    const byMajor = new Map<string, number[][]>()
 
     if (isAuthenticated && hasFormResponses) {
       // Try to use real data for authenticated users with form responses

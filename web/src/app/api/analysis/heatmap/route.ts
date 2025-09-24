@@ -14,12 +14,6 @@ type MajorGenreHeatmap = {
 }
 
 // Legacy types for feature-correlation fallback (now disabled)
-type FeatureCorrelation = {
-  type: 'feature-correlation'
-  features: string[]
-  matrix: number[][]
-  insights: string[]
-}
 
 export async function GET() {
   try {

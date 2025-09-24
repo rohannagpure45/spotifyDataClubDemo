@@ -1,21 +1,5 @@
 import { NextResponse } from 'next/server'
 
-interface ImportedResponse {
-  id: string
-  timestamp: string
-  name: string
-  email: string
-  major: string
-  favoriteSong: string
-  artist: string
-  genres: string[]
-  audioFeatures?: {
-    energy: number
-    valence: number
-    danceability: number
-    tempo: number
-  }
-}
 
 export async function POST(request: Request) {
   try {
