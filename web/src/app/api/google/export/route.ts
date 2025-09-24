@@ -83,10 +83,6 @@ export async function POST(request: Request) {
     // 2. Populate it with the group data
     // 3. Return the shareable link
 
-    // For now, simulate creating a Google Sheet and return a mock URL
-    const mockSheetId = Math.random().toString(36).substring(7)
-    const mockSheetUrl = `https://docs.google.com/spreadsheets/d/${mockSheetId}/edit?usp=sharing`
-
     // Create a summary for the sheet
     const summary = {
       totalGroups: groups.length,
@@ -98,14 +94,12 @@ export async function POST(request: Request) {
     }
 
     // In production, you would actually create the Google Sheet here
-    // For demo purposes, we'll return a mock response
+    // For now, only return the CSV content and summary
     return NextResponse.json({
       success: true,
-      url: mockSheetUrl,
-      sheetId: mockSheetId,
       summary,
       csvContent: csvContent, // Include CSV for download option
-      message: `Successfully exported ${groups.length} groups to Google Sheets`
+      message: `Generated CSV for ${groups.length} groups`
     })
   } catch (error) {
     console.error('Error exporting to Google Sheets:', error)

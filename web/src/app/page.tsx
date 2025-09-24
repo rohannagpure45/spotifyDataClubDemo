@@ -120,7 +120,6 @@ export default function SpotifyDashboard() {
   const [loading, setLoading] = useState(false)
   const [groupSize, setGroupSize] = useState(4)
   const [isFormingGroups, setIsFormingGroups] = useState(false)
-  const [useDemoGroups, setUseDemoGroups] = useState(false)
   const [replaceFormGroups, setReplaceFormGroups] = useState(false)
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
   const [importingFromGoogle, setImportingFromGoogle] = useState(false)
@@ -284,7 +283,7 @@ export default function SpotifyDashboard() {
       const response = await fetch('/api/groups/create', {
         method: 'POST',
         headers: {'Content-Type': 'application/json'},
-        body: JSON.stringify({ groupSize: groupSize, demo: useDemoGroups, replace: replaceFormGroups })
+        body: JSON.stringify({ groupSize: groupSize, replace: replaceFormGroups })
       })
       const data = await response.json()
       if (!response.ok || data?.success === false) {
@@ -336,7 +335,7 @@ export default function SpotifyDashboard() {
     }
   }
 
-  // Optional auto-import during demos: periodically process forms from Google Sheets
+  // Optional auto-import: periodically process forms from Google Sheets
   useEffect(() => {
     if (!autoImport || !googleSheetsUrl) return
 
@@ -816,15 +815,6 @@ export default function SpotifyDashboard() {
                     <label className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                       <input
                         type="checkbox"
-                        checked={useDemoGroups}
-                        onChange={(e) => setUseDemoGroups(e.target.checked)}
-                        className="accent-[var(--accent-primary)]"
-                      />
-                      Use demo data (no submissions)
-                    </label>
-                    <label className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
-                      <input
-                        type="checkbox"
                         checked={replaceFormGroups}
                         onChange={(e) => setReplaceFormGroups(e.target.checked)}
                         className="accent-[var(--accent-primary)]"
@@ -867,7 +857,7 @@ export default function SpotifyDashboard() {
                               onChange={(e) => setReplaceExisting(e.target.checked)}
                               className="accent-[var(--accent-primary)]"
                             />
-                            Replace existing groups (demo)
+                            Replace existing groups
                           </label>
                           <button
                             onClick={refreshSavedGroups}
@@ -883,7 +873,7 @@ export default function SpotifyDashboard() {
                               onChange={(e) => setAutoImport(e.target.checked)}
                               className="accent-[var(--spotify-green)]"
                             />
-                            Auto-import every 60s (demo)
+                            Auto-import every 60s
                           </label>
                           <label className="mt-2 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                             <input

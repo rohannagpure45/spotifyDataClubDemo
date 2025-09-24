@@ -47,101 +47,12 @@ export async function POST(request: Request) {
       }, { status: 400 })
     }
 
-    // Simulate importing data from Google Sheets
-    // In production, this would use Google Sheets API
-    const mockResponses: ImportedResponse[] = [
-      {
-        id: 'resp-1',
-        timestamp: new Date().toISOString(),
-        name: 'Emma Wilson',
-        email: 'emma.w@university.edu',
-        major: 'Data Science',
-        favoriteSong: 'Blinding Lights',
-        artist: 'The Weeknd',
-        genres: ['Synthpop', 'R&B', 'Electronic'],
-        audioFeatures: {
-          energy: 0.79,
-          valence: 0.33,
-          danceability: 0.51,
-          tempo: 171
-        }
-      },
-      {
-        id: 'resp-2',
-        timestamp: new Date().toISOString(),
-        name: 'James Chen',
-        email: 'j.chen@university.edu',
-        major: 'Computer Science',
-        favoriteSong: 'Starboy',
-        artist: 'The Weeknd ft. Daft Punk',
-        genres: ['Electronic', 'R&B', 'Pop'],
-        audioFeatures: {
-          energy: 0.59,
-          valence: 0.49,
-          danceability: 0.68,
-          tempo: 186
-        }
-      },
-      {
-        id: 'resp-3',
-        timestamp: new Date().toISOString(),
-        name: 'Sofia Rodriguez',
-        email: 's.rodriguez@university.edu',
-        major: 'Psychology',
-        favoriteSong: 'Flowers',
-        artist: 'Miley Cyrus',
-        genres: ['Pop', 'Dance', 'Disco'],
-        audioFeatures: {
-          energy: 0.68,
-          valence: 0.64,
-          danceability: 0.71,
-          tempo: 118
-        }
-      },
-      {
-        id: 'resp-4',
-        timestamp: new Date().toISOString(),
-        name: 'Michael Kim',
-        email: 'm.kim@university.edu',
-        major: 'Business',
-        favoriteSong: 'Anti-Hero',
-        artist: 'Taylor Swift',
-        genres: ['Pop', 'Alternative', 'Indie'],
-        audioFeatures: {
-          energy: 0.64,
-          valence: 0.53,
-          danceability: 0.64,
-          tempo: 97
-        }
-      },
-      {
-        id: 'resp-5',
-        timestamp: new Date().toISOString(),
-        name: 'Aisha Patel',
-        email: 'a.patel@university.edu',
-        major: 'Music',
-        favoriteSong: 'As It Was',
-        artist: 'Harry Styles',
-        genres: ['Pop Rock', 'Synthpop', 'Indie'],
-        audioFeatures: {
-          energy: 0.52,
-          valence: 0.66,
-          danceability: 0.52,
-          tempo: 174
-        }
-      }
-    ]
-
-    // Simulate processing delay
-    await new Promise(resolve => setTimeout(resolve, 1000))
-
+    // Google Sheets API integration not implemented here. Only CSV uploads or
+    // the process-forms endpoint should be used as sources of truth.
     return NextResponse.json({
-      success: true,
-      count: mockResponses.length,
-      responses: mockResponses,
-      sheetId,
-      message: `Successfully imported ${mockResponses.length} responses from Google Sheets`
-    })
+      success: false,
+      error: 'Google Sheets import not implemented. Use CSV upload or /api/google/process-forms.'
+    }, { status: 501 })
   } catch (error) {
     console.error('Error importing from Google Sheets:', error)
     return NextResponse.json({

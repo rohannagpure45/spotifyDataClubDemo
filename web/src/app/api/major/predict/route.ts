@@ -35,60 +35,6 @@ function cosine(a: number[], b: number[]): number {
   return denom === 0 ? 0 : dot / denom
 }
 
-// Demo training data for when no real data is available
-const getDemoTrainingData = (): Map<string, number[][]> => {
-  const demoData = new Map<string, number[][]>()
-
-  // Computer Science - High energy, moderate valence, electronic music
-  demoData.set('Computer Science', [
-    toVector({ energy: 0.8, valence: 0.6, danceability: 0.7, acousticness: 0.2, tempo: 128 }),
-    toVector({ energy: 0.85, valence: 0.55, danceability: 0.75, acousticness: 0.15, tempo: 140 }),
-    toVector({ energy: 0.9, valence: 0.65, danceability: 0.8, acousticness: 0.1, tempo: 135 }),
-    toVector({ energy: 0.75, valence: 0.7, danceability: 0.6, acousticness: 0.25, tempo: 120 })
-  ])
-
-  // Psychology - Moderate energy, high valence, indie/alternative
-  demoData.set('Psychology', [
-    toVector({ energy: 0.6, valence: 0.8, danceability: 0.5, acousticness: 0.4, tempo: 110 }),
-    toVector({ energy: 0.65, valence: 0.85, danceability: 0.55, acousticness: 0.35, tempo: 115 }),
-    toVector({ energy: 0.7, valence: 0.75, danceability: 0.6, acousticness: 0.3, tempo: 105 }),
-    toVector({ energy: 0.55, valence: 0.9, danceability: 0.45, acousticness: 0.5, tempo: 100 })
-  ])
-
-  // Business - Moderate everything, mainstream preferences
-  demoData.set('Business', [
-    toVector({ energy: 0.7, valence: 0.7, danceability: 0.7, acousticness: 0.3, tempo: 125 }),
-    toVector({ energy: 0.75, valence: 0.65, danceability: 0.75, acousticness: 0.25, tempo: 130 }),
-    toVector({ energy: 0.65, valence: 0.75, danceability: 0.65, acousticness: 0.35, tempo: 120 }),
-    toVector({ energy: 0.8, valence: 0.6, danceability: 0.8, acousticness: 0.2, tempo: 128 })
-  ])
-
-  // English Literature - Lower energy, high valence, acoustic preferences
-  demoData.set('English Literature', [
-    toVector({ energy: 0.4, valence: 0.8, danceability: 0.4, acousticness: 0.7, tempo: 95 }),
-    toVector({ energy: 0.45, valence: 0.85, danceability: 0.35, acousticness: 0.75, tempo: 90 }),
-    toVector({ energy: 0.35, valence: 0.9, danceability: 0.3, acousticness: 0.8, tempo: 85 }),
-    toVector({ energy: 0.5, valence: 0.75, danceability: 0.45, acousticness: 0.65, tempo: 100 })
-  ])
-
-  // Engineering - High energy, moderate valence, rock/metal
-  demoData.set('Engineering', [
-    toVector({ energy: 0.9, valence: 0.5, danceability: 0.6, acousticness: 0.1, tempo: 145 }),
-    toVector({ energy: 0.95, valence: 0.45, danceability: 0.55, acousticness: 0.05, tempo: 150 }),
-    toVector({ energy: 0.85, valence: 0.55, danceability: 0.65, acousticness: 0.15, tempo: 140 }),
-    toVector({ energy: 0.9, valence: 0.4, danceability: 0.5, acousticness: 0.1, tempo: 155 })
-  ])
-
-  // Biology - Moderate energy, high valence, nature-inspired
-  demoData.set('Biology', [
-    toVector({ energy: 0.6, valence: 0.85, danceability: 0.5, acousticness: 0.6, tempo: 108 }),
-    toVector({ energy: 0.55, valence: 0.9, danceability: 0.45, acousticness: 0.65, tempo: 102 }),
-    toVector({ energy: 0.65, valence: 0.8, danceability: 0.55, acousticness: 0.55, tempo: 112 }),
-    toVector({ energy: 0.7, valence: 0.75, danceability: 0.6, acousticness: 0.5, tempo: 115 })
-  ])
-
-  return demoData
-}
 
 // Calculate prediction accuracy from historical predictions
 async function calculateAccuracy(): Promise<{ accuracy: number; totalPredictions: number }> {
@@ -172,7 +118,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({})) as { features?: Partial<Features>; useLatest?: boolean }
     const { features: rawFeatures, useLatest } = body || {}
 
-    // Build training centroids per major from existing submissions or use demo data
+    // Build training centroids per major from existing submissions
     let byMajor = new Map<string, number[][]>()
     let usingDemoData = false
 
@@ -196,10 +142,12 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fallback to demo data if insufficient real data or unauthenticated user
+    // Require real data; if insufficient, return an error
     if (byMajor.size < 2) {
-      byMajor = getDemoTrainingData()
-      usingDemoData = true
+      return NextResponse.json({
+        success: false,
+        error: 'Insufficient training data. Import submissions via CSV/Google Forms first.'
+      }, { status: 400 })
     }
 
     // Compute centroids
@@ -291,7 +239,7 @@ export async function POST(request: Request) {
       method: 'centroid-cosine',
       datasetMajors: centroids.map(c => ({ major: c.major, samples: c.n })),
       usedMajors: filteredCentroids.map(c => ({ major: c.major, samples: c.n })),
-      usingDemoData,
+      usingDemoData: false,
       authenticated: isAuthenticated
     }
 

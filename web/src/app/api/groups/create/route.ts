@@ -22,7 +22,6 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const groupSize = typeof body.groupSize === 'number' && body.groupSize > 1 ? Math.min(8, Math.max(3, body.groupSize)) : 4
     const replace = Boolean(body.replace)
-    const demo = Boolean(body.demo || body.generateDemo)
 
     let members: ProcessedMember[] = []
 
@@ -46,37 +45,34 @@ export async function POST(request: Request) {
     calculateCompatibilities(members)
     const groups = formOptimizedGroups(members, groupSize)
 
-    // Optionally persist groups (skip if demo and DB not configured)
-    if (!demo || replace) {
-      try {
-        if (replace) {
-          await prisma.group.deleteMany({ where: { userId: session.user.id } })
-        }
-        for (const g of groups) {
-          const serializedMembers = g.members.map(m => ({
-            userId: m.userId || m.id,
-            name: m.name,
-            major: m.major,
-            musicProfile: {
-              topGenres: m.musicProfile.topGenres,
-              listeningStyle: m.musicProfile.listeningStyle
-            }
-          }))
-          await prisma.group.create({
-            data: {
-              userId: session.user.id,
-              name: demo ? `${g.name} (Demo)` : g.name,
-              members: JSON.stringify(serializedMembers),
-              compatibility: g.groupCompatibility,
-              commonGenres: JSON.stringify(g.commonGenres),
-              recommendations: JSON.stringify(g.recommendations)
-            }
-          })
-        }
-      } catch (e) {
-        // Ignore persistence errors in demo mode; surface errors otherwise
-        if (!demo) throw e
+    // Persist groups (always use real data; no demo mode)
+    try {
+      if (replace) {
+        await prisma.group.deleteMany({ where: { userId: session.user.id } })
       }
+      for (const g of groups) {
+        const serializedMembers = g.members.map(m => ({
+          userId: m.userId || m.id,
+          name: m.name,
+          major: m.major,
+          musicProfile: {
+            topGenres: m.musicProfile.topGenres,
+            listeningStyle: m.musicProfile.listeningStyle
+          }
+        }))
+        await prisma.group.create({
+          data: {
+            userId: session.user.id,
+            name: g.name,
+            members: JSON.stringify(serializedMembers),
+            compatibility: g.groupCompatibility,
+            commonGenres: JSON.stringify(g.commonGenres),
+            recommendations: JSON.stringify(g.recommendations)
+          }
+        })
+      }
+    } catch (e) {
+      throw e
     }
 
     // Prepare response payload similar to Google Forms processing

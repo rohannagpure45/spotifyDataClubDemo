@@ -147,47 +147,9 @@ export async function GET() {
       }
     }
 
-    // Last-resort demo: feature correlation matrix (static)
-    const features = [
-      'Energy',
-      'Danceability',
-      'Valence',
-      'Acousticness',
-      'Instrumentalness',
-      'Speechiness'
-    ]
-    const matrix = [
-      [1.0, 0.72, 0.45, -0.58, -0.32, 0.28],
-      [0.72, 1.0, 0.63, -0.42, -0.18, 0.35],
-      [0.45, 0.63, 1.0, -0.38, -0.25, 0.15],
-      [-0.58, -0.42, -0.38, 1.0, 0.55, -0.22],
-      [-0.32, -0.18, -0.25, 0.55, 1.0, -0.48],
-      [0.28, 0.35, 0.15, -0.22, -0.48, 1.0]
-    ]
-    const insights = [
-      'Strong positive correlation between Energy and Danceability (0.72)',
-      'Negative correlation between Energy and Acousticness (-0.58)',
-      'Valence moderately correlates with Danceability (0.63)',
-      'Instrumentalness and Speechiness show negative correlation (-0.48)'
-    ]
-    const fallback: FeatureCorrelation = {
-      type: 'feature-correlation',
-      features,
-      matrix,
-      insights
-    }
-    return NextResponse.json(fallback)
+    // No real data available
+    return NextResponse.json({ success: false, error: 'No data available for heatmap' }, { status: 404 })
   } catch {
-    // Preserve original static demo on unexpected error
-    const features = ['Energy','Danceability','Valence','Acousticness','Instrumentalness','Speechiness']
-    const matrix = [
-      [1.0, 0.72, 0.45, -0.58, -0.32, 0.28],
-      [0.72, 1.0, 0.63, -0.42, -0.18, 0.35],
-      [0.45, 0.63, 1.0, -0.38, -0.25, 0.15],
-      [-0.58, -0.42, -0.38, 1.0, 0.55, -0.22],
-      [-0.32, -0.18, -0.25, 0.55, 1.0, -0.48],
-      [0.28, 0.35, 0.15, -0.22, -0.48, 1.0]
-    ]
-    return NextResponse.json({ type: 'feature-correlation', features, matrix, insights: [] })
+    return NextResponse.json({ success: false, error: 'Failed to compute heatmap' }, { status: 500 })
   }
 }
