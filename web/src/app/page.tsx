@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
-import { Music, Users, BarChart3, Gamepad2, Trophy, Activity, Sparkles, Network, Users2, Joystick } from "lucide-react"
+import { Music, Users, BarChart3, Gamepad2, Trophy, Activity, Sparkles, Network, Users2, Joystick, Upload } from "lucide-react"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Modal } from "@/components/ui/modal"
@@ -710,7 +710,7 @@ export default function SpotifyDashboard() {
                   </p>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <button
                     onClick={() => handleOpenModal('Audio Feature Matching', 'audioMatch')}
                     className="p-6 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] hover:bg-[var(--surface-elevated)] transition-all duration-300 group cursor-pointer text-left"
@@ -737,6 +737,20 @@ export default function SpotifyDashboard() {
                     </div>
                     <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
                       Discover others who share your taste in musical styles, artists, and genres
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => window.location.href = '/forms-processor'}
+                    className="p-6 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] hover:bg-[var(--surface-elevated)] transition-all duration-300 group cursor-pointer text-left"
+                  >
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 rounded-lg bg-[var(--spotify-green)]/10 flex items-center justify-center">
+                        <Upload className="h-4 w-4 text-[var(--spotify-green)]" />
+                      </div>
+                      <h4 className="font-semibold text-[var(--text-primary)] group-hover:text-[var(--spotify-green)] transition-colors">Import CSV Data</h4>
+                    </div>
+                    <p className="text-sm text-[var(--text-secondary)] leading-relaxed">
+                      Upload Google Forms responses and create optimized music groups based on preferences
                     </p>
                   </button>
                 </div>

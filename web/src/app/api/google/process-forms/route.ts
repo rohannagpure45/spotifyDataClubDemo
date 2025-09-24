@@ -579,6 +579,100 @@ async function ensureUserExists(email: string, name?: string, major?: string, ye
   return user
 }
 
+// Preprocess CSV data to map Google Form columns to expected format
+function preprocessCSVData(rawData: unknown[]): unknown[] {
+  if (!Array.isArray(rawData) || rawData.length === 0) return rawData
+
+  return rawData.map((row: unknown) => {
+    if (!row || typeof row !== 'object') return row
+
+    const rowRecord = row as Record<string, unknown>
+
+    // Map your Google Form columns to expected format
+    const preprocessed: Record<string, unknown> = {}
+
+    // Handle email field (case-insensitive)
+    const emailField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('email')
+    )
+    if (emailField && rowRecord[emailField]) {
+      preprocessed.email = rowRecord[emailField]
+    }
+
+    // Combine First Name and Last Name
+    const firstNameField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('first') && key.toLowerCase().includes('name')
+    )
+    const lastNameField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('last') && key.toLowerCase().includes('name')
+    )
+
+    if (firstNameField || lastNameField) {
+      const firstName = firstNameField ? rowRecord[firstNameField] || '' : ''
+      const lastName = lastNameField ? rowRecord[lastNameField] || '' : ''
+      preprocessed.name = `${firstName} ${lastName}`.trim()
+    }
+
+    // Handle major field
+    const majorField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('major')
+    )
+    if (majorField && rowRecord[majorField]) {
+      preprocessed.major = rowRecord[majorField]
+    } else {
+      preprocessed.major = 'Undeclared'
+    }
+
+    // Handle year field
+    const yearField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('year')
+    )
+    if (yearField && rowRecord[yearField]) {
+      preprocessed.year = rowRecord[yearField]
+    }
+
+    // Handle favorite song
+    const songField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('song')
+    )
+    if (songField && rowRecord[songField]) {
+      preprocessed.favorite_song = rowRecord[songField]
+    }
+
+    // Handle favorite artists
+    const artistsField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('artist')
+    )
+    if (artistsField && rowRecord[artistsField]) {
+      preprocessed.favorite_artists = rowRecord[artistsField]
+    }
+
+    // Handle genres
+    const genresField = Object.keys(rowRecord).find(key =>
+      key.toLowerCase().includes('genre')
+    )
+    if (genresField && rowRecord[genresField]) {
+      preprocessed.genres = rowRecord[genresField]
+    }
+
+    // Set default audio features (since not collected in your form)
+    preprocessed.energy = '0.5'
+    preprocessed.valence = '0.5'
+    preprocessed.danceability = '0.5'
+    preprocessed.acousticness = '0.3'
+    preprocessed.tempo = '120'
+
+    // Copy any other fields that might exist
+    Object.keys(rowRecord).forEach(key => {
+      if (!preprocessed.hasOwnProperty(key.toLowerCase())) {
+        preprocessed[key] = rowRecord[key]
+      }
+    })
+
+    return preprocessed
+  })
+}
+
 export async function POST(request: Request) {
   try {
     const session = await getServerSession(authOptions)
@@ -601,11 +695,30 @@ export async function POST(request: Request) {
     // Process file upload (CSV)
     if (file && file.size > 0) {
       const text = await file.text()
-      responses = parse(text, {
+      const rawResponses = parse(text, {
         columns: true,
         skip_empty_lines: true,
         trim: true
       })
+
+      // Preprocess CSV data to map Google Form columns to expected format
+      responses = preprocessCSVData(rawResponses)
+
+      // Validate that we have essential columns after preprocessing
+      if (responses.length > 0) {
+        const firstRow = responses[0] as Record<string, unknown>
+        const missingFields: string[] = []
+
+        if (!firstRow?.email) missingFields.push('Email')
+        if (!firstRow?.name || String(firstRow.name).trim() === '') missingFields.push('Name (First Name + Last Name)')
+
+        if (missingFields.length > 0) {
+          return NextResponse.json({
+            success: false,
+            error: `Missing required columns: ${missingFields.join(', ')}. Please ensure your CSV has columns for Email, First Name, and Last Name.`
+          }, { status: 400 })
+        }
+      }
     }
 
     // Process Google Sheets URL
