@@ -287,7 +287,14 @@ export default function SpotifyDashboard() {
         body: JSON.stringify({ groupSize: groupSize, demo: useDemoGroups, replace: replaceFormGroups })
       })
       const data = await response.json()
-      setGroups(data.groups)
+      if (!response.ok || data?.success === false) {
+        const msg = (data && (data.error || data.message)) || 'Failed to create groups. Please try again.'
+        alert(msg)
+        // Ensure groups state remains a safe array
+        setGroups([])
+        return
+      }
+      setGroups(normalizeGroups(data.groups || []))
     } catch (error) {
       console.error('Error forming groups:', error)
     } finally {
@@ -951,7 +958,7 @@ export default function SpotifyDashboard() {
                               {group.members.map((member: UIGroupMember) => (
                                 <div key={member.userId} className="flex items-center gap-2">
                                   <div className="w-6 h-6 rounded-full bg-gradient-to-r from-[var(--accent-primary)] to-[var(--accent-secondary)] flex items-center justify-center text-xs text-white font-bold">
-                                    {member.username.charAt(0).toUpperCase()}
+                                    {(member?.username || 'M').charAt(0).toUpperCase()}
                                   </div>
                                   <div className="text-xs flex-1">
                                     <span className="font-medium text-[var(--text-primary)]">{member.username}</span>

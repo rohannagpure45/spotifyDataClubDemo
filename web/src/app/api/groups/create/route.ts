@@ -9,7 +9,7 @@ import {
   generateCSV,
   type OptimizedGroup,
   type ProcessedMember,
-  generateDemoMembers
+  
 } from '@/lib/music-utils'
 
 export async function POST(request: Request) {
