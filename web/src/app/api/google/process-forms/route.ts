@@ -745,9 +745,63 @@ export async function POST(request: Request) {
         }, { status: 400 })
       }
 
-      // In production, fetch actual data from Google Sheets API
-      // For now, use mock data
-      responses = generateMockResponses(20)
+      // Fetch actual data from Google Sheets using CSV export
+      try {
+        const csvExportUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/export?format=csv`
+
+        const response = await fetch(csvExportUrl)
+
+        if (!response.ok) {
+          if (response.status === 403) {
+            return NextResponse.json({
+              success: false,
+              error: 'Unable to access the Google Sheet. Please ensure the sheet is publicly accessible or shared with viewing permissions.'
+            }, { status: 400 })
+          }
+          throw new Error(`HTTP ${response.status}: Failed to fetch spreadsheet data`)
+        }
+
+        const csvText = await response.text()
+
+        if (!csvText || csvText.trim() === '') {
+          return NextResponse.json({
+            success: false,
+            error: 'The Google Sheet appears to be empty or contains no data.'
+          }, { status: 400 })
+        }
+
+        const rawResponses = parse(csvText, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true
+        })
+
+        // Preprocess CSV data to map Google Form columns to expected format
+        responses = preprocessCSVData(rawResponses)
+
+        // Validate that we have essential columns after preprocessing
+        if (responses.length > 0) {
+          const firstRow = responses[0] as Record<string, unknown>
+          const missingFields: string[] = []
+
+          if (!firstRow?.email) missingFields.push('Email')
+          if (!firstRow?.name || String(firstRow.name).trim() === '') missingFields.push('Name (First Name + Last Name)')
+
+          if (missingFields.length > 0) {
+            return NextResponse.json({
+              success: false,
+              error: `Missing required columns in Google Sheet: ${missingFields.join(', ')}. Please ensure your sheet has columns for Email, First Name, and Last Name.`
+            }, { status: 400 })
+          }
+        }
+
+      } catch (error) {
+        console.error('Error fetching Google Sheets data:', error)
+        return NextResponse.json({
+          success: false,
+          error: `Failed to fetch Google Sheets data: ${error instanceof Error ? error.message : 'Unknown error'}. Please ensure the sheet is publicly accessible.`
+        }, { status: 500 })
+      }
     }
 
     // Validate we have data

@@ -45,19 +45,84 @@ export default function GroupFormProcessor() {
   const [groupSize, setGroupSize] = useState(4)
   const [isProcessing, setIsProcessing] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [isDragOver, setIsDragOver] = useState(false)
+  const [filePreview, setFilePreview] = useState<string[][] | null>(null)
+  const [showPreview, setShowPreview] = useState(false)
   const [results, setResults] = useState<{
     groups: ProcessedGroup[]
     summary: ProcessingSummary
     csvContent: string
   } | null>(null)
 
+  const validateAndSetFile = async (selectedFile: File) => {
+    if (!selectedFile.name.toLowerCase().endsWith('.csv')) {
+      setError('Please select a valid CSV file')
+      return
+    }
+
+    if (selectedFile.size > 10 * 1024 * 1024) { // 10MB limit
+      setError('File size must be less than 10MB')
+      return
+    }
+
+    try {
+      // Read and preview first few rows
+      const text = await selectedFile.text()
+      const lines = text.split('\n').slice(0, 6) // Header + 5 rows
+      const preview = lines.map(line => {
+        // Simple CSV parsing for preview
+        const cells = []
+        let current = ''
+        let inQuotes = false
+
+        for (let i = 0; i < line.length; i++) {
+          const char = line[i]
+          if (char === '"') {
+            inQuotes = !inQuotes
+          } else if (char === ',' && !inQuotes) {
+            cells.push(current.trim())
+            current = ''
+          } else {
+            current += char
+          }
+        }
+        cells.push(current.trim())
+        return cells
+      })
+
+      setFile(selectedFile)
+      setFilePreview(preview)
+      setError(null)
+      setShowPreview(true)
+    } catch (err) {
+      setError('Failed to read CSV file')
+    }
+  }
+
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0]
-    if (selectedFile && selectedFile.type === 'text/csv') {
-      setFile(selectedFile)
-      setError(null)
-    } else {
-      setError('Please select a valid CSV file')
+    if (selectedFile) {
+      validateAndSetFile(selectedFile)
+    }
+  }
+
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(true)
+  }
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+  }
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault()
+    setIsDragOver(false)
+
+    const droppedFile = e.dataTransfer.files[0]
+    if (droppedFile) {
+      validateAndSetFile(droppedFile)
     }
   }
 
@@ -156,7 +221,18 @@ export default function GroupFormProcessor() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Upload CSV File
                   </label>
-                  <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-purple-400 transition-colors">
+                  <div
+                    className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
+                      isDragOver
+                        ? 'border-purple-500 bg-purple-50'
+                        : file
+                        ? 'border-green-400 bg-green-50'
+                        : 'border-gray-300 hover:border-purple-400'
+                    }`}
+                    onDragOver={handleDragOver}
+                    onDragLeave={handleDragLeave}
+                    onDrop={handleDrop}
+                  >
                     <input
                       type="file"
                       accept=".csv"
@@ -168,16 +244,36 @@ export default function GroupFormProcessor() {
                       htmlFor="file-upload"
                       className="cursor-pointer flex flex-col items-center"
                     >
-                      <Upload className="w-12 h-12 text-gray-400 mb-3" />
+                      <Upload className={`w-12 h-12 mb-3 transition-colors ${
+                        isDragOver
+                          ? 'text-purple-500'
+                          : file
+                          ? 'text-green-500'
+                          : 'text-gray-400'
+                      }`} />
                       {file ? (
-                        <span className="text-purple-600 font-medium">{file.name}</span>
+                        <div className="space-y-2">
+                          <span className="text-green-600 font-medium">{file.name}</span>
+                          <div className="text-sm text-gray-600">
+                            {(file.size / 1024).toFixed(1)} KB
+                          </div>
+                          <button
+                            type="button"
+                            onClick={() => setShowPreview(true)}
+                            className="text-sm text-purple-600 hover:text-purple-700 underline"
+                          >
+                            Preview Data
+                          </button>
+                        </div>
                       ) : (
                         <>
-                          <span className="text-gray-600">
-                            Click to upload or drag and drop
+                          <span className={`text-lg font-medium ${
+                            isDragOver ? 'text-purple-700' : 'text-gray-600'
+                          }`}>
+                            {isDragOver ? 'Drop your CSV file here' : 'Click to upload or drag and drop'}
                           </span>
                           <span className="text-sm text-gray-500 mt-1">
-                            CSV files with form responses
+                            CSV files with form responses (Max 10MB)
                           </span>
                         </>
                       )}
@@ -384,6 +480,87 @@ export default function GroupFormProcessor() {
             </div>
           )}
         </div>
+
+        {/* Data Preview Modal */}
+        {showPreview && filePreview && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-xl p-6 max-w-4xl max-h-[80vh] overflow-auto">
+              <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-bold text-gray-900">CSV Data Preview</h3>
+                <button
+                  onClick={() => setShowPreview(false)}
+                  className="text-gray-500 hover:text-gray-700"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="mb-4">
+                <p className="text-sm text-gray-600">
+                  File: <span className="font-medium">{file?.name}</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Size: <span className="font-medium">{file ? (file.size / 1024).toFixed(1) : 0} KB</span>
+                </p>
+                <p className="text-sm text-gray-600">
+                  Showing first 5 rows
+                </p>
+              </div>
+
+              {filePreview.length > 0 && (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        {filePreview[0].map((header, index) => (
+                          <th key={index} className="px-4 py-2 border-b text-left text-sm font-medium text-gray-900">
+                            {header || `Column ${index + 1}`}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {filePreview.slice(1).map((row, rowIndex) => (
+                        <tr key={rowIndex} className={rowIndex % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          {row.map((cell, cellIndex) => (
+                            <td key={cellIndex} className="px-4 py-2 border-b text-sm text-gray-700">
+                              {cell || '—'}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              <div className="mt-6 flex justify-between">
+                <div className="text-sm text-gray-600">
+                  Make sure your CSV includes Email, First Name, and Last Name columns
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={() => setShowPreview(false)}
+                    className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowPreview(false)
+                      // Auto-trigger form submission if file looks good
+                      const form = document.querySelector('form') as HTMLFormElement
+                      if (form) form.requestSubmit()
+                    }}
+                    className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  >
+                    Process Data
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   )
