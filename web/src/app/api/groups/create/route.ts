@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     calculateCompatibilities(members)
     const groups = formOptimizedGroups(members, groupSize)
 
-    // Persist groups (always use real data; no demo mode)
+    // Persist groups (always use real data)
     try {
       if (replace) {
         await prisma.group.deleteMany({ where: { userId: session.user.id } })

@@ -920,7 +920,7 @@ export async function POST(request: Request) {
     // Form optimized groups (shared util)
     const groups = formGroups(members, groupSize)
 
-    // Replace existing groups if requested (demo mode)
+    // Replace existing groups if requested
     if (replace) {
       if (replaceScope === 'all') {
         await prisma.group.deleteMany({})

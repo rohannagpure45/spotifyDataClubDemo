@@ -497,5 +497,4 @@ export function buildMembersFromUsers(users: Array<{ id: string; email: string; 
   })
 }
 
-// Demo data generator for fallbacks
-// (Demo generator removed) Only real/imported data is used as the source of truth.
+// Only real/imported data is used as the source of truth.

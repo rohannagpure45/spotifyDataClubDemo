@@ -13,7 +13,7 @@ type MajorGenreHeatmap = {
   insights: string[]
 }
 
-// Legacy fallback response (feature correlation demo)
+// Legacy types for feature-correlation fallback (now disabled)
 type FeatureCorrelation = {
   type: 'feature-correlation'
   features: string[]

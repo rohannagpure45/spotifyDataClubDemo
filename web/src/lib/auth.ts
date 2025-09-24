@@ -68,5 +68,6 @@ export const authOptions: NextAuthOptions = {
   pages: {
     signIn: '/auth/login'
   },
-  secret: process.env.NEXTAUTH_SECRET || 'demo-secret-key'
+  // Provide a secret via env in production. Fallback only for local dev.
+  secret: process.env.NEXTAUTH_SECRET ?? undefined
 }

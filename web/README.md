@@ -11,8 +11,7 @@ A Next.js web application for processing Google Forms responses and creating opt
 - **Session Management** - Persistent login with route protection
 
 ### 📊 **Google Forms Integration**
-- **CSV Upload** - Process Google Forms exports directly
-- **Google Sheets URL** - Direct integration with live sheets
+- **CSV Upload** - Process Google Forms exports directly (source of truth)
 - **Email Mapping** - Links form responses to user accounts by email
 - **Flexible Format** - Handles various question structures
 
@@ -32,7 +31,7 @@ A Next.js web application for processing Google Forms responses and creating opt
 - Smooth transitions and hover effects
 
 ### 💾 **Data Persistence**
-- **SQLite Database** - Local file-based database for demo simplicity
+- **SQLite Database** - Local file-based database for development simplicity
 - **Prisma ORM** - Type-safe database operations with auto-generated client
 - **User-Scoped Data** - Each user only sees their own groups and submissions
 - **Form History** - Complete tracking of processed forms and responses
@@ -101,23 +100,10 @@ web/
 
 ## 🔌 API Routes
 
-### GET `/api/spotify`
-Query parameters:
-- `?action=recent` - Get recent submissions
-- `?action=stats` - Get aggregated statistics
-- `?action=analysis` - Get clustering/analysis data
-- `?action=leaderboard` - Get awards and leaderboard data
-
-### POST `/api/spotify`
-Submit new song entry:
-```json
-{
-  "song": "Anti-Hero",
-  "artist": "Taylor Swift",
-  "major": "Computer Science",
-  "name": "Alex"
-}
-```
+- `/api/google/process-forms` — Process CSV/Sheets form data, map to users, persist responses and groups.
+- `/api/groups` — Fetch saved groups (supports `public=true` for shared view).
+- `/api/groups/create` — Create optimized groups from saved submissions for the current user.
+- `/api/major/predict` — Predict a user’s major from features or latest submission (requires real data).
 
 ## 🎨 Design System
 
@@ -161,7 +147,7 @@ Submit new song entry:
 - Later, the real user signs up via `/auth/signup` using the same email:
   - The signup route detects the `autoCreated` user and upgrades it with the provided password, preserving the profile fields from the forms.
 
-### Safely Preload the Database (for demos)
+### Safely Preload the Database
 - Minimal tables to link:
   - `User` — create one row per email appearing in the form data.
     - For accounts that should be “claimable” later, set `autoCreated = true` and use any placeholder password (it will be replaced at signup).
@@ -218,12 +204,10 @@ Submit new song entry:
     - `tempo` (BPM, number)
 - Notes:
   - CSV headers must match those keys exactly for the best mapping.
-  - If using a Google Sheet URL in the dashboard, the current demo uses mock data (no real Google API calls yet). CSV upload is recommended for live demos.
+  - Prefer CSV uploads. Google Sheets URL integration may not be available without API credentials.
 
-6) Getting data into the database
-- Automatic (recommended for demos):
+- Getting data into the database
   - Go to `/forms-processor`, upload the Google Forms CSV export, choose group size, and click Create Groups.
-  - Or on the dashboard, use the “📥 Import + Process” (Sheets URL → mock data) option.
   - Processing will:
     - Create/update Users per response email (`autoCreated` if new)
     - Save `FormResponse` and `MusicSubmission` rows
@@ -233,13 +217,13 @@ Submit new song entry:
   - Start the app; users can sign up and claim their accounts by email.
 
 7) Shared groups visibility
-- The API `GET /api/groups?public=true` returns recent groups across all users for demo sharing.
+- The API `GET /api/groups?public=true` returns recent groups across all users for shared viewing.
 - The dashboard’s automatic 10s refresh and manual refresh both use the public scope to ensure one person’s processing is visible to everyone.
 
-### API Quick Reference (demo scope)
+### API Quick Reference
 - `POST /api/google/process-forms` — Process CSV/Sheets form data, map to users, persist responses and groups.
-- `GET /api/groups?limit=50&public=true` — Fetch recent groups for demo viewing (across users).
-- `POST /api/major/predict` — Predict a user’s major from features or latest submission. Requires a mapped FormResponse for the current user.
+- `GET /api/groups?limit=50&public=true` — Fetch recent groups across users (shared view).
+- `POST /api/major/predict` — Predict a user’s major from features or latest submission.
 
 ### Admin: Backfill Placeholder Profiles
 - Some users may be created with placeholders (e.g., `major='Undeclared'`, `year='Unknown'`).
@@ -249,9 +233,8 @@ Submit new song entry:
   - `GET /api/admin/backfill-placeholders` returns a quick summary (counts) without modifying data.
   - This updates only placeholder fields when valid values exist in the latest form JSON.
 
-### Demo Tips & Pitfalls
-- Prefer CSV uploads for live demos (Sheets URL uses mock responses in the current code).
-- Avoid leaving “Auto‑import every 60s” running for long — it will keep creating new Groups; use manual refresh to browse saved groups.
+### Tips
+- Prefer CSV uploads for reliable processing.
 - For the Major Predictor, ensure users have at least one `FormResponse` (and ideally some `MusicSubmission` rows) so the model has sufficient training data and the user is authorized to predict.
 
 
