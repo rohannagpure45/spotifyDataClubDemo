@@ -770,11 +770,57 @@ export async function POST(request: Request) {
           }, { status: 400 })
         }
 
-        const rawResponses = parse(csvText, {
-          columns: true,
-          skip_empty_lines: true,
-          trim: true
-        })
+        // Check if Google returned HTML instead of CSV (common for private/invalid sheets)
+        const contentType = response.headers.get('content-type') || ''
+        const isHTML = contentType.includes('text/html') ||
+                      csvText.trim().startsWith('<!DOCTYPE') ||
+                      csvText.trim().startsWith('<html')
+
+        if (isHTML) {
+          return NextResponse.json({
+            success: false,
+            error: 'Unable to access the Google Sheet. The sheet may be private or the URL is invalid. Please ensure the sheet is publicly accessible and the URL is correct.'
+          }, { status: 400 })
+        }
+
+        // Parse CSV with error handling
+        let rawResponses: unknown[]
+        try {
+          rawResponses = parse(csvText, {
+            columns: true,
+            skip_empty_lines: true,
+            trim: true
+          })
+        } catch (parseError) {
+          return NextResponse.json({
+            success: false,
+            error: `Invalid CSV format: ${parseError instanceof Error ? parseError.message : 'Unable to parse CSV data'}. Please ensure the Google Sheet is properly formatted.`
+          }, { status: 400 })
+        }
+
+        // Validate that CSV parsing returned actual data
+        if (!Array.isArray(rawResponses) || rawResponses.length === 0) {
+          return NextResponse.json({
+            success: false,
+            error: 'No valid data found in the Google Sheet. Please ensure the sheet contains at least one row of data with proper column headers.'
+          }, { status: 400 })
+        }
+
+        // Check if first row looks like actual data (not HTML fragments)
+        const firstRow = rawResponses[0] as Record<string, unknown>
+        const hasValidColumns = Object.keys(firstRow).length > 0 &&
+                               !Object.keys(firstRow).some(key =>
+                                 key.toLowerCase().includes('doctype') ||
+                                 key.toLowerCase().includes('html') ||
+                                 key.toLowerCase().includes('body')
+                               )
+
+        if (!hasValidColumns) {
+          return NextResponse.json({
+            success: false,
+            error: 'The sheet data appears to be invalid or corrupted. Please ensure the Google Sheet is publicly accessible and contains valid column headers.'
+          }, { status: 400 })
+        }
 
         // Preprocess CSV data to map Google Form columns to expected format
         responses = preprocessCSVData(rawResponses)
@@ -938,45 +984,7 @@ export async function POST(request: Request) {
   }
 }
 
-// Generate mock responses for testing
-function generateMockResponses(count: number): unknown[] {
-  const names = ['Alice', 'Bob', 'Charlie', 'Diana', 'Eve', 'Frank', 'Grace', 'Henry', 'Iris', 'Jack']
-  const majors = ['Computer Science', 'Psychology', 'Business', 'Engineering', 'Music', 'Biology']
-  const years = ['Freshman', 'Sophomore', 'Junior', 'Senior']
-  const genres = ['Pop', 'Rock', 'Hip Hop', 'Electronic', 'Jazz', 'Classical', 'R&B', 'Country', 'Indie', 'Metal']
-  const artists = ['Taylor Swift', 'The Weeknd', 'Drake', 'Billie Eilish', 'Ed Sheeran', 'Ariana Grande', 'Post Malone', 'Dua Lipa']
-
-  const responses = []
-  for (let i = 0; i < count; i++) {
-    const selectedGenres: string[] = []
-    for (let j = 0; j < 3; j++) {
-      const genre = genres[Math.floor(Math.random() * genres.length)]
-      if (!selectedGenres.includes(genre)) {
-        selectedGenres.push(genre)
-      }
-    }
-
-    responses.push({
-      timestamp: new Date(Date.now() - Math.random() * 7 * 24 * 60 * 60 * 1000).toISOString(),
-      name: `${names[i % names.length]} ${['Smith', 'Johnson', 'Williams', 'Brown'][i % 4]}`,
-      email: `user${i + 1}@university.edu`,
-      major: majors[Math.floor(Math.random() * majors.length)],
-      year: years[Math.floor(Math.random() * years.length)],
-      genres: selectedGenres.join(','),
-      favorite_artists: artists.slice(
-        Math.floor(Math.random() * artists.length),
-        Math.floor(Math.random() * artists.length) + 2
-      ).join(','),
-      energy: (0.3 + Math.random() * 0.6).toFixed(2),
-      valence: (0.3 + Math.random() * 0.6).toFixed(2),
-      danceability: (0.3 + Math.random() * 0.6).toFixed(2),
-      acousticness: (0.2 + Math.random() * 0.5).toFixed(2),
-      tempo: (80 + Math.random() * 100).toFixed(0)
-    })
-  }
-
-  return responses
-}
+// Mock data generation has been removed - we only process real data from actual Google Sheets or CSV files
 
 // GET endpoint to download CSV
 export async function GET(request: Request) {

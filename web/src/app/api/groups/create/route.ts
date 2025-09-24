@@ -26,25 +26,20 @@ export async function POST(request: Request) {
 
     let members: ProcessedMember[] = []
 
-    if (demo) {
-      // Demo mode: skip DB reads entirely
-      members = generateDemoMembers(20)
-    } else {
-      // Load real users with music submissions
-      const usersWithMusic = await prisma.user.findMany({
-        where: { submissions: { some: {} } },
-        include: { submissions: true }
-      })
+    // Load real users with music submissions
+    const usersWithMusic = await prisma.user.findMany({
+      where: { submissions: { some: {} } },
+      include: { submissions: true }
+    })
 
-      if (usersWithMusic.length > 0) {
-        members = buildMembersFromUsers(usersWithMusic)
-      } else {
-        return NextResponse.json({
-          success: false,
-          error: 'No users with music submissions found. Import data via Google Sheets or submit music first.',
-          hint: 'Use the demo toggle to generate example groups.'
-        }, { status: 400 })
-      }
+    if (usersWithMusic.length > 0) {
+      members = buildMembersFromUsers(usersWithMusic)
+    } else {
+      return NextResponse.json({
+        success: false,
+        error: 'No users with music submissions found. Import data via Google Sheets or submit music first.',
+        hint: 'Process your Google Forms data first to create groups from real submissions.'
+      }, { status: 400 })
     }
 
     // Compute compatibilities and form groups
