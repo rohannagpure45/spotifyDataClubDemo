@@ -124,6 +124,7 @@ export default function SpotifyDashboard() {
   const [uploadingFile, setUploadingFile] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const fileInputId = 'group-upload-csv-xlsx'
+  const fileInputIdTop = 'music-twin-upload-top'
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
   const [importingFromGoogle, setImportingFromGoogle] = useState(false)
   const [autoImport, setAutoImport] = useState(false)
@@ -718,6 +719,52 @@ export default function SpotifyDashboard() {
                     Our advanced algorithm analyzes your music preferences to find your perfect musical soulmate in the community.
                   </p>
                 </div>
+
+                {/* Quick Upload CTA (CSV/XLSX) */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 p-4 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)]">
+                  <input
+                    id={fileInputIdTop}
+                    type="file"
+                    accept=".csv,.xlsx"
+                    className="hidden"
+                    onChange={async (e) => {
+                      const f = e.target.files?.[0]
+                      if (!f) return
+                      setUploadingFile(true)
+                      setUploadError(null)
+                      try {
+                        const fd = new FormData()
+                        fd.append('file', f)
+                        fd.append('groupSize', String(groupSize))
+                        const resp = await fetch('/api/google/process-forms', { method: 'POST', body: fd })
+                        const payload = await resp.json()
+                        if (!resp.ok) throw new Error(payload.error || 'Upload failed')
+                        setGroups(normalizeGroups(payload.groups || []))
+                      } catch (err) {
+                        setUploadError(err instanceof Error ? err.message : 'Upload failed')
+                      } finally {
+                        setUploadingFile(false)
+                        // Reset to allow re-selecting the same file
+                        const input = document.getElementById(fileInputIdTop) as HTMLInputElement | null
+                        if (input) input.value = ''
+                      }
+                    }}
+                  />
+                  <button
+                    onClick={() => (document.getElementById(fileInputIdTop) as HTMLInputElement | null)?.click()}
+                    disabled={uploadingFile}
+                    className="px-4 py-3 bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+                    title="Upload CSV or Excel (.xlsx) with form responses"
+                  >
+                    {uploadingFile ? 'Uploading…' : 'Upload CSV/XLSX'}
+                  </button>
+                  <div className="text-xs text-[var(--text-tertiary)]">
+                    Tip: You can also use the Import CSV card below or paste a Google Sheets URL in Group Formation.
+                  </div>
+                </div>
+                {uploadError && (
+                  <div className="-mt-2 text-xs text-red-600">{uploadError}</div>
+                )}
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                   <button
