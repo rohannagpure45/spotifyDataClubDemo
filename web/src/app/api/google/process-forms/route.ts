@@ -12,6 +12,7 @@ import * as XLSX from 'xlsx'
 
 interface ProcessedMember {
   id: string
+  userId?: string
   name: string
   email: string
   major: string
@@ -890,6 +891,7 @@ export async function POST(request: Request) {
 
     // Create users for all email addresses in responses and store form data
     const touchedSubmissions: Array<{ id: string; userId: string; song: string; artist: string }> = []
+    const processedUserIds = new Set<string>()
     for (let i = 0; i < (responses as FormRow[]).length; i++) {
       const response = (responses as FormRow[])[i]
       const rawEmail = getStr(response, 'email')
@@ -914,6 +916,9 @@ export async function POST(request: Request) {
             processed: true
           }
         })
+
+        // Track user for rebuild
+        processedUserIds.add(user.id)
 
         // Store music submission if it doesn't exist
         const favorite_artists = getStr(response, 'favorite_artists')
@@ -965,6 +970,7 @@ export async function POST(request: Request) {
             processed: true
           }
         })
+        processedUserIds.add(user.id)
       }
     }
 
@@ -1009,7 +1015,7 @@ export async function POST(request: Request) {
           }
         }
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn('Spotify sync after import failed (continuing):', e)
     }
 
@@ -1025,11 +1031,69 @@ export async function POST(request: Request) {
         // recompute groups
         groups = formOptimizedGroups(members, groupSize)
       }
-    } catch (e) {
+    } catch (e: unknown) {
       console.warn('DB-based grouping failed (using initial CSV-derived groups):', e)
     }
 
-    // (Moved saving + response after Spotify sync and DB-based rebuild)
+    // Replace existing groups if requested
+    if (replace) {
+      if (replaceScope === 'all') {
+        await prisma.group.deleteMany({})
+      } else {
+        await prisma.group.deleteMany({ where: { userId: session.user.id } })
+      }
+    }
+
+    // Save groups to database for the current user
+    for (const group of groups) {
+      await prisma.group.create({
+        data: {
+          userId: session.user.id,
+          name: group.name,
+          members: JSON.stringify(group.members.map(m => ({
+            userId: m.userId ?? m.id,
+            name: m.name,
+            major: m.major,
+            musicProfile: { topGenres: m.musicProfile.topGenres, listeningStyle: m.musicProfile.listeningStyle }
+          }))),
+          compatibility: group.groupCompatibility,
+          commonGenres: JSON.stringify(group.commonGenres),
+          recommendations: JSON.stringify(group.recommendations)
+        }
+      })
+    }
+
+    // Generate CSV
+    const csvContent = generateCSV(groups)
+
+    // Create summary statistics
+    const summary = {
+      totalResponses: responses.length,
+      totalGroups: groups.length,
+      averageGroupSize: responses.length / (groups.length || 1),
+      averageCompatibility: groups.reduce((sum, g) => sum + g.groupCompatibility, 0) / (groups.length || 1),
+      topGenres: Array.from(
+        groups.reduce((genres, g) => {
+          g.commonGenres.forEach(genre => genres.add(genre))
+          return genres
+        }, new Set<string>())
+      ).slice(0, 10),
+      timestamp: new Date().toISOString()
+    }
+
+    return NextResponse.json({
+      success: true,
+      groups: groups.map(g => ({
+        ...g,
+        members: g.members.map(m => ({
+          ...m,
+          compatibility: Array.from(m.compatibility.entries())
+        }))
+      })),
+      summary,
+      csvContent,
+      message: `Successfully processed ${responses.length} responses into ${groups.length} optimized groups`
+    })
 
   } catch (error) {
     console.error('Error processing forms:', error)
