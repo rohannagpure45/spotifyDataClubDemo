@@ -380,6 +380,7 @@ export default function SpotifyDashboard() {
   const [adminBusy, setAdminBusy] = useState(false)
   const [adminError, setAdminError] = useState<string | null>(null)
   const [adminSummary, setAdminSummary] = useState<{ totalUsers: number; placeholders: number } | null>(null)
+  const [spotifySummary, setSpotifySummary] = useState<{ totalSubmissions: number; distinctTracks: number } | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -405,6 +406,12 @@ export default function SpotifyDashboard() {
       }
       const data = await resp.json()
       setAdminSummary({ totalUsers: data.totalUsers, placeholders: data.placeholders })
+      // Also fetch Spotify summary
+      const sresp = await fetch('/api/admin/backfill-spotify')
+      if (sresp.ok) {
+        const sdata = await sresp.json()
+        setSpotifySummary(sdata.summary)
+      }
     } catch {
       setAdminError('Failed to load summary')
     }
@@ -424,6 +431,27 @@ export default function SpotifyDashboard() {
       alert(`Backfill complete: ${data.updatedUsers} users updated (scanned ${data.scannedUsers}).`)
     } catch {
       setAdminError('Backfill failed')
+    } finally {
+      setAdminBusy(false)
+    }
+  }
+
+  const runSpotifyBackfill = async (force = true) => {
+    setAdminBusy(true)
+    setAdminError(null)
+    try {
+      const resp = await fetch('/api/admin/backfill-spotify', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ force }) })
+      const data = await resp.json()
+      if (!resp.ok || !data.success) {
+        setAdminError(data.error || `Spotify backfill failed: ${resp.status}`)
+        return
+      }
+      await refreshAdminSummary()
+      alert(`Spotify backfill complete: updated ${data.updatedRows} rows (matched ${data.matchedTracks} tracks).`)
+      // Refresh stats so leaderboard pulls updated numbers
+      fetchStats()
+    } catch {
+      setAdminError('Spotify backfill failed')
     } finally {
       setAdminBusy(false)
     }
@@ -1278,18 +1306,28 @@ export default function SpotifyDashboard() {
                           <div>
                             <div>Total users: {adminSummary.totalUsers}</div>
                             <div>Users with placeholders: {adminSummary.placeholders}</div>
+                            {spotifySummary && (
+                              <div>Distinct tracks: {spotifySummary.distinctTracks} • Submissions: {spotifySummary.totalSubmissions}</div>
+                            )}
                           </div>
                         ) : (
                           <div>Summary not loaded.</div>
                         )}
                       </div>
-                      <div className="mt-2">
+                      <div className="mt-2 flex gap-2 flex-wrap">
                         <button
                           onClick={runBackfill}
                           disabled={adminBusy}
                           className="px-4 py-2 text-xs rounded bg-[var(--accent-warning)]/20 hover:bg-[var(--accent-warning)]/30 text-[var(--text-primary)] disabled:opacity-50"
                         >
                           {adminBusy ? 'Backfilling…' : 'Backfill Placeholder Profiles'}
+                        </button>
+                        <button
+                          onClick={() => runSpotifyBackfill(true)}
+                          disabled={adminBusy}
+                          className="px-4 py-2 text-xs rounded bg-[var(--spotify-green)]/20 hover:bg-[var(--spotify-green)]/30 text-[var(--text-primary)] disabled:opacity-50"
+                        >
+                          {adminBusy ? 'Syncing…' : 'Sync Spotify Audio Features'}
                         </button>
                       </div>
                     </div>

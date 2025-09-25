@@ -57,3 +57,39 @@ export async function fetchAudioFeaturesFor(song: string, artist?: string): Prom
   }
 }
 
+export async function searchTrackId(song: string, artist?: string): Promise<string | null> {
+  const token = await getAccessToken()
+  if (!token) return null
+  const q = artist ? `track:${song} artist:${artist}` : song
+  const encoded = encodeURIComponent(q)
+  const url = `https://api.spotify.com/v1/search?q=${encoded}&type=track&limit=1`
+  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+  if (!resp.ok) return null
+  const data = await resp.json() as any
+  return data?.tracks?.items?.[0]?.id ?? null
+}
+
+export async function fetchAudioFeaturesBatch(ids: string[]): Promise<Record<string, AudioFeatures>> {
+  const token = await getAccessToken()
+  const out: Record<string, AudioFeatures> = {}
+  if (!token || ids.length === 0) return out
+  const chunks: string[][] = []
+  for (let i = 0; i < ids.length; i += 100) chunks.push(ids.slice(i, i + 100))
+  for (const chunk of chunks) {
+    const url = `https://api.spotify.com/v1/audio-features?ids=${chunk.join(',')}`
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!resp.ok) continue
+    const data = await resp.json() as any
+    const feats = Array.isArray(data?.audio_features) ? data.audio_features : []
+    for (const f of feats) {
+      if (!f || !f.id) continue
+      out[f.id] = {
+        energy: Number(f.energy ?? NaN),
+        valence: Number(f.valence ?? NaN),
+        danceability: Number(f.danceability ?? NaN),
+        tempo: Number(f.tempo ?? NaN),
+      }
+    }
+  }
+  return out
+}
