@@ -65,9 +65,15 @@ type FormRow = Record<string, unknown>
 
 function getStr(row: FormRow, key: string): string | undefined {
   const v = row[key]
-  if (typeof v === 'string') return v
+  if (typeof v === 'string') return v.trim()
   if (typeof v === 'number') return String(v)
   return undefined
+}
+
+function isValidEmail(email?: string): boolean {
+  if (!email) return false
+  // Basic, permissive email check
+  return /.+@.+\..+/.test(email)
 }
 
 function processFormResponses(responses: unknown[]): ProcessedMember[] {
@@ -600,7 +606,7 @@ function preprocessCSVData(rawData: unknown[]): unknown[] {
       preprocessed.email = rowRecord[emailField]
     }
 
-    // Combine First Name and Last Name
+    // Combine First Name and Last Name or map a single Name field
     const firstNameField = Object.keys(rowRecord).find(key =>
       key.toLowerCase().includes('first') && key.toLowerCase().includes('name')
     )
@@ -612,6 +618,11 @@ function preprocessCSVData(rawData: unknown[]): unknown[] {
       const firstName = firstNameField ? rowRecord[firstNameField] || '' : ''
       const lastName = lastNameField ? rowRecord[lastNameField] || '' : ''
       preprocessed.name = `${firstName} ${lastName}`.trim()
+    } else {
+      const nameField = Object.keys(rowRecord).find(key => key.toLowerCase() === 'name' || key.toLowerCase().includes('full name'))
+      if (nameField && rowRecord[nameField]) {
+        preprocessed.name = String(rowRecord[nameField])
+      }
     }
 
     // Handle major field
@@ -725,18 +736,14 @@ export async function POST(request: Request) {
       // Preprocess data to map Google Form columns to expected format
       responses = preprocessCSVData(rawResponses)
 
-      // Validate that we have essential columns after preprocessing
+      // Optional: we no longer hard-require Email; we will generate a placeholder if missing
+      // We still recommend having a Name column
       if (responses.length > 0) {
         const firstRow = responses[0] as Record<string, unknown>
-        const missingFields: string[] = []
-
-        if (!firstRow?.email) missingFields.push('Email')
-        if (!firstRow?.name || String(firstRow.name).trim() === '') missingFields.push('Name (First Name + Last Name)')
-
-        if (missingFields.length > 0) {
+        if (!firstRow?.name || String(firstRow.name).trim() === '') {
           return NextResponse.json({
             success: false,
-            error: `Missing required columns: ${missingFields.join(', ')}. Please ensure your CSV has columns for Email, First Name, and Last Name.`
+            error: 'Missing required column: Name. Please include a Name column or First/Last Name columns.'
           }, { status: 400 })
         }
       }
@@ -846,18 +853,13 @@ export async function POST(request: Request) {
         // Preprocess CSV data to map Google Form columns to expected format
         responses = preprocessCSVData(rawResponses)
 
-        // Validate that we have essential columns after preprocessing
+        // Optional: we no longer hard-require Email; we will generate a placeholder if missing
         if (responses.length > 0) {
           const firstRow = responses[0] as Record<string, unknown>
-          const missingFields: string[] = []
-
-          if (!firstRow?.email) missingFields.push('Email')
-          if (!firstRow?.name || String(firstRow.name).trim() === '') missingFields.push('Name (First Name + Last Name)')
-
-          if (missingFields.length > 0) {
+          if (!firstRow?.name || String(firstRow.name).trim() === '') {
             return NextResponse.json({
               success: false,
-              error: `Missing required columns in Google Sheet: ${missingFields.join(', ')}. Please ensure your sheet has columns for Email, First Name, and Last Name.`
+              error: 'Missing required column in Google Sheet: Name. Please include a Name column or First/Last Name columns.'
             }, { status: 400 })
           }
         }
@@ -886,21 +888,24 @@ export async function POST(request: Request) {
     calcCompat(members)
 
     // Create users for all email addresses in responses and store form data
-    for (const response of responses as FormRow[]) {
-      const email = getStr(response, 'email')
-      if (email) {
+    for (let i = 0; i < (responses as FormRow[]).length; i++) {
+      const response = (responses as FormRow[])[i]
+      const rawEmail = getStr(response, 'email')
+      const safeEmail = isValidEmail(rawEmail) ? rawEmail! : `user${i + 1}@example.local`
+
+      try {
         const user = await ensureUserExists(
-          email,
-          getStr(response, 'name'),
-          getStr(response, 'major'),
-          getStr(response, 'year')
+          safeEmail,
+          getStr(response, 'name') || `User ${i + 1}`,
+          getStr(response, 'major') || 'Undeclared',
+          getStr(response, 'year') || 'Unknown'
         )
 
         // Store the form response
         await prisma.formResponse.create({
           data: {
             userId: user.id,
-            email: email,
+            email: safeEmail,
             formData: JSON.stringify(response),
             sourceType: file ? 'csv' : 'sheets',
             sourceUrl: sheetsUrl || null,
@@ -925,7 +930,7 @@ export async function POST(request: Request) {
                 userId: user.id,
                 songName: getStr(response, 'favorite_song') || 'Unknown',
                 artistName: favorite_artists || 'Unknown',
-                genres: JSON.stringify(genresStr ? genresStr.split(',') : []),
+                genres: JSON.stringify(genresStr ? String(genresStr).split(',') : []),
                 energy: parseFloat(getStr(response, 'energy') || '0.5'),
                 valence: parseFloat(getStr(response, 'valence') || '0.5'),
                 danceability: parseFloat(getStr(response, 'danceability') || '0.5'),
@@ -935,6 +940,25 @@ export async function POST(request: Request) {
             })
           }
         }
+      } catch (e) {
+        // Fallback: if user creation fails due to bad email, retry with generated placeholder
+        const fallbackEmail = `autogen${Date.now()}_${i}@example.local`
+        const user = await ensureUserExists(
+          fallbackEmail,
+          getStr(response, 'name') || `User ${i + 1}`,
+          getStr(response, 'major') || 'Undeclared',
+          getStr(response, 'year') || 'Unknown'
+        )
+        await prisma.formResponse.create({
+          data: {
+            userId: user.id,
+            email: fallbackEmail,
+            formData: JSON.stringify(response),
+            sourceType: file ? 'csv' : 'sheets',
+            sourceUrl: sheetsUrl || null,
+            processed: true
+          }
+        })
       }
     }
 
@@ -998,9 +1022,13 @@ export async function POST(request: Request) {
 
   } catch (error) {
     console.error('Error processing forms:', error)
+    const raw = error instanceof Error ? error.message : 'Unknown error'
+    const friendly = /did not match the expected pattern/i.test(raw)
+      ? 'A value in your CSV appears invalid (likely an email). Please ensure the Email column contains valid addresses, or try removing that column. You can still form groups without emails.'
+      : raw
     return NextResponse.json({
       success: false,
-      error: `Failed to process forms: ${error instanceof Error ? error.message : 'Unknown error'}`
+      error: `Failed to process forms: ${friendly}`
     }, { status: 500 })
   }
 }
