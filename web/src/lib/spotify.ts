@@ -33,6 +33,10 @@ export type AudioFeatures = {
   tempo: number
 }
 
+type SpotifySearchResponse = { tracks: { items: Array<{ id: string }> } }
+type SpotifyAudioFeaturesWire = { id?: string; energy?: number; valence?: number; danceability?: number; tempo?: number }
+type SpotifyAudioFeaturesBatchResponse = { audio_features: SpotifyAudioFeaturesWire[] }
+
 export async function fetchAudioFeaturesFor(song: string, artist?: string): Promise<AudioFeatures | null> {
   const token = await getAccessToken()
   if (!token) return null
@@ -42,13 +46,13 @@ export async function fetchAudioFeaturesFor(song: string, artist?: string): Prom
   const headers = { Authorization: `Bearer ${token}` }
   const sresp = await fetch(searchUrl, { headers })
   if (!sresp.ok) return null
-  const sdata = await sresp.json() as any
-  const id = sdata?.tracks?.items?.[0]?.id
+  const sdata = await sresp.json() as SpotifySearchResponse
+  const id = sdata.tracks?.items?.[0]?.id
   if (!id) return null
   const featuresUrl = `https://api.spotify.com/v1/audio-features/${id}`
   const fresp = await fetch(featuresUrl, { headers })
   if (!fresp.ok) return null
-  const fdata = await fresp.json() as any
+  const fdata = await fresp.json() as SpotifyAudioFeaturesWire
   return {
     energy: Number(fdata.energy ?? NaN),
     valence: Number(fdata.valence ?? NaN),
@@ -65,8 +69,8 @@ export async function searchTrackId(song: string, artist?: string): Promise<stri
   const url = `https://api.spotify.com/v1/search?q=${encoded}&type=track&limit=1`
   const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
   if (!resp.ok) return null
-  const data = await resp.json() as any
-  return data?.tracks?.items?.[0]?.id ?? null
+  const data = await resp.json() as SpotifySearchResponse
+  return data.tracks?.items?.[0]?.id ?? null
 }
 
 export async function fetchAudioFeaturesBatch(ids: string[]): Promise<Record<string, AudioFeatures>> {
@@ -79,8 +83,8 @@ export async function fetchAudioFeaturesBatch(ids: string[]): Promise<Record<str
     const url = `https://api.spotify.com/v1/audio-features?ids=${chunk.join(',')}`
     const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
     if (!resp.ok) continue
-    const data = await resp.json() as any
-    const feats = Array.isArray(data?.audio_features) ? data.audio_features : []
+    const data = await resp.json() as SpotifyAudioFeaturesBatchResponse
+    const feats = Array.isArray(data.audio_features) ? data.audio_features : []
     for (const f of feats) {
       if (!f || !f.id) continue
       out[f.id] = {

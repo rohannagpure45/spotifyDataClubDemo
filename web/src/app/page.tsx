@@ -562,13 +562,13 @@ export default function SpotifyDashboard() {
     try {
       const resp = await fetch('/api/analysis/pca')
       if (!resp.ok) return
-      const data = await resp.json()
-      const comp = Array.isArray(data.components) && data.components[0]
+      const data = await resp.json() as PCAData
+      const comp = Array.isArray(data.components) ? data.components[0] : undefined
       if (!comp || !Array.isArray(comp.features)) return
       const top = [...comp.features]
-        .sort((a: any, b: any) => Math.abs(b.loading) - Math.abs(a.loading))
+        .sort((a, b) => Math.abs(b.loading) - Math.abs(a.loading))
         .slice(0, 3)
-        .map((f: any) => ({ feature: String(f.feature), loading: Number(f.loading) }))
+        .map((f) => ({ feature: String(f.feature), loading: Number(f.loading) }))
       setPcaTopFeatures(top)
     } catch (e) {
       console.debug('PCA fetch failed (ignored):', e)

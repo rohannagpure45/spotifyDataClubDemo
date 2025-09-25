@@ -162,12 +162,12 @@ export function pca(X: number[][], k = 3): { components: number[][]; variances: 
   }
 
   // Power iteration to get top-k eigenvectors
-  function matVec(A: number[][], v: number[]): number[] {
-    const m = A.length
+  function matVec(M: number[][], v: number[]): number[] {
+    const m = M.length
     const out = new Array(m).fill(0)
     for (let i = 0; i < m; i++) {
       let s = 0
-      for (let j = 0; j < m; j++) s += A[i][j] * v[j]
+      for (let j = 0; j < m; j++) s += M[i][j] * v[j]
       out[i] = s
     }
     return out
@@ -177,7 +177,7 @@ export function pca(X: number[][], k = 3): { components: number[][]; variances: 
 
   const comps: number[][] = []
   const eigvals: number[] = []
-  let A = S.map(row => [...row])
+  const A = S.map(row => [...row])
 
   for (let c = 0; c < Math.min(k, d); c++) {
     let v = new Array(d).fill(0).map(() => Math.random())
@@ -195,7 +195,7 @@ export function pca(X: number[][], k = 3): { components: number[][]; variances: 
     eigvals.push(lambda)
     comps.push(v)
     // Deflate: A = A - lambda v v^T
-    const outer = comps[c].map((vi, i) => comps[c].map(vj => vi * vj))
+    const outer = comps[c].map((vi) => comps[c].map(vj => vi * vj))
     for (let i = 0; i < d; i++) {
       for (let j = 0; j < d; j++) {
         A[i][j] = A[i][j] - lambda * outer[i][j]
@@ -207,11 +207,9 @@ export function pca(X: number[][], k = 3): { components: number[][]; variances: 
   const explained = eigvals.map(v => v / totalVar)
 
   // Scores: Z * components (columns)
-  const compCols = comps[0] ? comps[0].map((_, j) => comps.map(row => row[j])) : [] // not used
   const scores = Z.map(row => comps.map(comp => row.reduce((s, x, i) => s + x * comp[i], 0)))
 
   return { components: comps, variances: eigvals, explained, means, stds, scores }
 }
 
 export function featureNames(): FeatureName[] { return [...FEATURE_NAMES] }
-

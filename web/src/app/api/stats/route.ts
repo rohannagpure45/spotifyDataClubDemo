@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { fetchAudioFeaturesFor } from '@/lib/spotify'
+import { fetchAudioFeaturesFor, type AudioFeatures } from '@/lib/spotify'
 
 export async function GET() {
   try {
@@ -117,9 +117,9 @@ export async function GET() {
       ) : null
 
     // Spotify enrichment for leaderboard awards (if credentials are configured)
-    let spotifyMostEnergetic: any = null
-    let spotifyHappiest: any = null
-    let spotifyMostDanceable: any = null
+    let spotifyMostEnergetic: AudioFeatures | null = null
+    let spotifyHappiest: AudioFeatures | null = null
+    let spotifyMostDanceable: AudioFeatures | null = null
     try {
       if (mostEnergetic) {
         const f = await fetchAudioFeaturesFor(mostEnergetic.songName, mostEnergetic.artistName)
