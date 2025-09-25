@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { calculateCompatibilities as calcCompat, formOptimizedGroups as formGroups, generateCSV as genCSV } from '@/lib/music-utils'
+import * as XLSX from 'xlsx'
 
 // (Removed unused FormResponse interface to satisfy lint)
 
@@ -701,12 +702,10 @@ export async function POST(request: Request) {
         // Parse Excel (first worksheet)
         try {
           const buf = await file.arrayBuffer()
-          // @ts-ignore: runtime import; types may not be present in all envs
-          const XLSX: any = await import('xlsx')
           const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
           const sheetName = wb.SheetNames[0]
           const sheet = wb.Sheets[sheetName]
-          rawResponses = XLSX.utils.sheet_to_json(sheet, { defval: '' }) as unknown[]
+          rawResponses = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '' }) as unknown[]
         } catch (e) {
           return NextResponse.json({
             success: false,
