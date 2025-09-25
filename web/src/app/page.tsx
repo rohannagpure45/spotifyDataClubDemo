@@ -121,6 +121,9 @@ export default function SpotifyDashboard() {
   const [groupSize, setGroupSize] = useState(4)
   const [isFormingGroups, setIsFormingGroups] = useState(false)
   const [replaceFormGroups, setReplaceFormGroups] = useState(false)
+  const [uploadingFile, setUploadingFile] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const fileInputId = 'group-upload-csv-xlsx'
   const [googleSheetsUrl, setGoogleSheetsUrl] = useState('')
   const [importingFromGoogle, setImportingFromGoogle] = useState(false)
   const [autoImport, setAutoImport] = useState(false)
@@ -801,7 +804,7 @@ export default function SpotifyDashboard() {
                         </div>
                       </div>
 
-                    <div className="flex gap-2">
+                    <div className="flex gap-2 items-center">
                       <button
                         onClick={handleFormGroups}
                         disabled={isFormingGroups}
@@ -809,8 +812,48 @@ export default function SpotifyDashboard() {
                       >
                         {isFormingGroups ? 'Forming...' : 'Form Groups'}
                       </button>
+                      {/* Inline CSV/XLSX upload near Form Groups */}
+                      <input
+                        id={fileInputId}
+                        type="file"
+                        accept=".csv,.xlsx"
+                        className="hidden"
+                        onChange={async (e) => {
+                          const f = e.target.files?.[0]
+                          if (!f) return
+                          setUploadingFile(true)
+                          setUploadError(null)
+                          try {
+                            const fd = new FormData()
+                            fd.append('file', f)
+                            fd.append('groupSize', String(groupSize))
+                            const resp = await fetch('/api/google/process-forms', { method: 'POST', body: fd })
+                            const payload = await resp.json()
+                            if (!resp.ok) throw new Error(payload.error || 'Upload failed')
+                            setGroups(normalizeGroups(payload.groups || []))
+                          } catch (err) {
+                            setUploadError(err instanceof Error ? err.message : 'Upload failed')
+                          } finally {
+                            setUploadingFile(false)
+                            // Reset the input so same file can be re-selected
+                            const input = document.getElementById(fileInputId) as HTMLInputElement | null
+                            if (input) input.value = ''
+                          }
+                        }}
+                      />
+                      <button
+                        onClick={() => (document.getElementById(fileInputId) as HTMLInputElement | null)?.click()}
+                        disabled={uploadingFile}
+                        className="px-4 py-3 bg-[var(--surface-secondary)] hover:bg-[var(--surface-elevated)] text-[var(--text-primary)] rounded-xl text-sm font-medium transition-colors disabled:opacity-50"
+                        title="Upload CSV or Excel (.xlsx) with form responses"
+                      >
+                        {uploadingFile ? 'Uploading…' : 'Upload CSV/XLSX'}
+                      </button>
                     </div>
                   </div>
+                  {uploadError && (
+                    <div className="mt-2 text-xs text-red-600">{uploadError}</div>
+                  )}
                   <div className="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                     <label className="flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                       <input

@@ -692,16 +692,38 @@ export async function POST(request: Request) {
 
     let responses: unknown[] = []
 
-    // Process file upload (CSV)
+    // Process file upload (CSV or XLSX)
     if (file && file.size > 0) {
-      const text = await file.text()
-      const rawResponses = parse(text, {
-        columns: true,
-        skip_empty_lines: true,
-        trim: true
-      })
+      const filename = (file.name || '').toLowerCase()
+      let rawResponses: unknown[] = []
 
-      // Preprocess CSV data to map Google Form columns to expected format
+      if (filename.endsWith('.xlsx')) {
+        // Parse Excel (first worksheet)
+        try {
+          const buf = await file.arrayBuffer()
+          // @ts-ignore: runtime import; types may not be present in all envs
+          const XLSX: any = await import('xlsx')
+          const wb = XLSX.read(new Uint8Array(buf), { type: 'array' })
+          const sheetName = wb.SheetNames[0]
+          const sheet = wb.Sheets[sheetName]
+          rawResponses = XLSX.utils.sheet_to_json(sheet, { defval: '' }) as unknown[]
+        } catch (e) {
+          return NextResponse.json({
+            success: false,
+            error: `Failed to read .xlsx file: ${e instanceof Error ? e.message : 'unknown error'}. Please upload a CSV as a fallback.`
+          }, { status: 400 })
+        }
+      } else {
+        // Default to CSV parsing
+        const text = await file.text()
+        rawResponses = parse(text, {
+          columns: true,
+          skip_empty_lines: true,
+          trim: true
+        }) as unknown[]
+      }
+
+      // Preprocess data to map Google Form columns to expected format
       responses = preprocessCSVData(rawResponses)
 
       // Validate that we have essential columns after preprocessing

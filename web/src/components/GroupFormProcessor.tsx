@@ -200,7 +200,7 @@ export default function GroupFormProcessor() {
                 }`}
               >
                 <Upload className="inline w-5 h-5 mr-2" />
-                Upload CSV
+                Upload CSV/XLSX
               </button>
               <button
                 onClick={() => setActiveTab('sheets')}
@@ -219,7 +219,7 @@ export default function GroupFormProcessor() {
               {activeTab === 'upload' ? (
                 <div>
                   <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Upload CSV File
+                    Upload CSV/XLSX File
                   </label>
                   <div
                     className={`border-2 border-dashed rounded-lg p-8 text-center transition-all duration-200 ${
@@ -235,7 +235,7 @@ export default function GroupFormProcessor() {
                   >
                     <input
                       type="file"
-                      accept=".csv"
+                      accept=".csv,.xlsx"
                       onChange={handleFileChange}
                       className="hidden"
                       id="file-upload"
@@ -273,7 +273,7 @@ export default function GroupFormProcessor() {
                             {isDragOver ? 'Drop your CSV file here' : 'Click to upload or drag and drop'}
                           </span>
                           <span className="text-sm text-gray-500 mt-1">
-                            CSV files with form responses (Max 10MB)
+                            CSV or Excel (.xlsx) files with form responses (Max 10MB)
                           </span>
                         </>
                       )}
