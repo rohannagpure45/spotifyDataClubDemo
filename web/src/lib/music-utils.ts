@@ -369,23 +369,36 @@ export function formOptimizedGroups(
   return groups
 }
 
-// Group name suggestion based on genres and styles
+// Generate simple, realistic group names for demo
 export function generateGroupName(genres: string[], members: ProcessedMember[]): string {
+  // Get the most common majors
+  const majorCounts = new Map<string, number>()
+  members.forEach(m => {
+    majorCounts.set(m.major, (majorCounts.get(m.major) || 0) + 1)
+  })
+  const topMajor = Array.from(majorCounts.entries())
+    .sort((a, b) => b[1] - a[1])[0]?.[0]
+
+  // Use primary genre for group naming
   const primary = genres[0]
+
   if (primary) {
-    const prefixes = ['The', 'Sonic', 'Harmonic', 'Rhythmic', 'Electric']
-    const names = ['Collective', 'Crew', 'Alliance', 'Guild', 'Assembly']
-    const suffixes = ['Society', 'Circle', 'Network', 'Union', 'Club']
-    const prefix = prefixes[Math.floor(Math.random() * prefixes.length)]
-    const name = names[Math.floor(Math.random() * names.length)]
-    const suffix = suffixes[Math.floor(Math.random() * suffixes.length)]
-    return `${prefix} ${primary} ${name} ${suffix}`
+    // Create simple genre-based names
+    const formats = [
+      `${primary} Music Group`,
+      `${primary} Study Group`,
+      `${primary} Listening Circle`,
+      `${primary} Appreciation Club`
+    ]
+    return formats[Math.floor(Math.random() * formats.length)]
   }
 
-  const styles = members.map(m => m.musicProfile.listeningStyle)
-  const unique = [...new Set(styles)]
-  if (unique.length === 1) return `The ${unique[0]} Group`
-  return `Music Group ${Math.floor(Math.random() * 100)}`
+  if (topMajor && topMajor !== 'Unknown' && topMajor !== 'Undeclared') {
+    return `${topMajor} Music Group`
+  }
+
+  // Fallback to simple sequential naming
+  return `Music Group ${Date.now().toString().slice(-3)}`
 }
 
 // Generate recommendations for the group

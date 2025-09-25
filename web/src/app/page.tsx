@@ -180,7 +180,7 @@ export default function SpotifyDashboard() {
   const refreshSavedGroups = async () => {
     try {
       setIsRefreshingSaved(true)
-      const resp = await fetch('/api/groups?limit=50&public=true')
+      const resp = await fetch('/api/groups?limit=50')
       if (!resp.ok) return
       const payload = await resp.json()
       setGroups(normalizeGroups(payload.groups || []))

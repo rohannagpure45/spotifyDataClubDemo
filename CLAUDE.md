@@ -180,6 +180,34 @@ The application now uses **100% dynamic data** from the database, with no hardco
 - Validation of required vs optional fields
 - Real-time dashboard updates after processing
 
+### Group Creation System
+
+The group formation feature creates optimized music groups based on compatibility algorithms:
+
+#### Data Requirements
+- **Real Data Only**: Groups are only created from actual Google Forms submissions
+- **No Mock Data**: All previous test data has been cleared from the database
+- **User Authentication**: Groups are tied to authenticated user sessions
+
+#### Group Generation Process
+1. **Data Collection**: Loads users with music submissions from database
+2. **Compatibility Analysis**: Calculates pairwise compatibility scores using music features
+3. **Group Formation**: Uses optimization algorithms to form balanced groups
+4. **Name Generation**: Creates realistic group names based on genres and majors
+5. **Database Storage**: Persists groups for the authenticated user only
+
+#### Group Names
+Group names are generated using realistic patterns:
+- `{Genre} Music Group` (e.g., "Pop Music Group")
+- `{Genre} Study Group` (e.g., "Jazz Study Group")
+- `{Major} Music Group` (e.g., "Computer Science Music Group")
+- Fallback: `Music Group {timestamp}`
+
+#### API Endpoints
+- `/api/groups/create` - POST: Creates new groups from real user data
+- `/api/groups` - GET: Retrieves user's saved groups (no public groups)
+- Requires authentication for all operations
+
 ## Key Files Reference
 
 - **Frontend**: `web/src/app/page.tsx` (fully dynamic UI)
