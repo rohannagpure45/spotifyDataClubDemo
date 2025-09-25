@@ -149,9 +149,65 @@ st.title("🎵 Live Music DNA Analysis")
 st.markdown("### *Can we predict your major from your music taste?*")
 
 # Fetch and process data
-def load_and_process_data():
-    """Load and process the latest data."""
-    df = sheets_client.fetch_responses()
+def _normalize_imported_dataframe(df: pd.DataFrame) -> pd.DataFrame:
+    """Normalize column names and map common fields for imported CSV/XLSX."""
+    if df is None or df.empty:
+        return pd.DataFrame()
+
+    # Normalize column names
+    df = df.copy()
+    df.columns = [str(c).strip().lower().replace(" ", "_").replace("-", "_") for c in df.columns]
+
+    # Map favorite song
+    if 'favorite_song' not in df.columns:
+        for alt in ['song', 'track', 'track_name', 'song_title']:
+            if alt in df.columns:
+                df['favorite_song'] = df[alt]
+                break
+
+    # Map artist (from favorite_artists/artists -> first artist)
+    if 'artist' not in df.columns:
+        for alt in ['favorite_artists', 'artists', 'artist_name']:
+            if alt in df.columns:
+                def _first_artist(x) -> str:
+                    try:
+                        if isinstance(x, list):
+                            return str(x[0]) if x else ''
+                        s = str(x)
+                        return s.split(',')[0].strip() if s else ''
+                    except Exception:
+                        return ''
+                df['artist'] = df[alt].apply(_first_artist)
+                break
+
+    # Ensure name exists
+    if 'name' not in df.columns:
+        df['name'] = [f"Anonymous {i+1}" for i in range(len(df))]
+
+    # Map genres if alternate present
+    if 'genres' not in df.columns:
+        for alt in ['genre', 'music_genres']:
+            if alt in df.columns:
+                df['genres'] = df[alt]
+                break
+
+    return df
+
+
+def load_and_process_data(source_df: pd.DataFrame | None = None):
+    """Load and process the latest data. If a source_df is provided or an uploaded
+    file is present in session state, prefer that over Google Sheets."""
+    # Prefer explicitly provided data
+    base_df: pd.DataFrame | None = None
+
+    if source_df is not None:
+        base_df = source_df
+    elif st.session_state.get('use_uploaded_data') and st.session_state.get('uploaded_df_raw') is not None:
+        base_df = st.session_state.get('uploaded_df_raw')
+    else:
+        base_df = sheets_client.fetch_responses()
+
+    df = _normalize_imported_dataframe(base_df) if base_df is not None else pd.DataFrame()
 
     if not df.empty:
         # Process with Spotify enrichment
@@ -229,6 +285,53 @@ with tab1:
 
 with tab2:
     st.header("🎵 Group Finder")
+
+    # CSV/XLSX Import (placed near group formation controls)
+    st.subheader("Import Responses (CSV/XLSX)")
+    import_cols = st.columns([3, 2])
+    with import_cols[0]:
+        uploaded_file = st.file_uploader(
+            "Upload Google Forms export (.csv or .xlsx)",
+            type=["csv", "xlsx"],
+            accept_multiple_files=False,
+            help="Use this if sharing a Google Sheet isn't working."
+        )
+    with import_cols[1]:
+        if uploaded_file is not None:
+            if st.button("Import File", type="primary", use_container_width=True):
+                try:
+                    if uploaded_file.name.lower().endswith('.csv'):
+                        imported = pd.read_csv(uploaded_file)
+                    else:
+                        # Excel support requires openpyxl in the environment
+                        try:
+                            imported = pd.read_excel(uploaded_file)
+                        except ImportError as e:
+                            st.error("Reading .xlsx requires 'openpyxl'. Please install it or upload a CSV.")
+                            imported = pd.DataFrame()
+
+                    normalized = _normalize_imported_dataframe(imported)
+                    if normalized.empty:
+                        st.warning("Uploaded file appears empty or missing required columns.")
+                    else:
+                        st.session_state.uploaded_df_raw = normalized
+                        st.session_state.use_uploaded_data = True
+                        # Process and persist for all tabs/metrics
+                        processed = load_and_process_data(source_df=normalized)
+                        st.session_state.processed_df = processed
+                        st.session_state.responses_count = len(processed)
+                        st.success(f"Imported {len(processed)} rows from {uploaded_file.name}")
+                        st.rerun()
+                except Exception as e:
+                    st.error(f"Failed to import file: {e}")
+
+        # Clear imported data
+        if st.session_state.get('use_uploaded_data'):
+            if st.button("Clear Imported Data", type="secondary", use_container_width=True):
+                st.session_state.use_uploaded_data = False
+                st.session_state.uploaded_df_raw = None
+                st.success("Cleared imported data; reverting to Google Sheets.")
+                st.rerun()
 
     if not df.empty and len(df) >= 6:
         # Group formation controls
