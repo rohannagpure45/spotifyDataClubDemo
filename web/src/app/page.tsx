@@ -117,6 +117,7 @@ export default function SpotifyDashboard() {
     activityRate: number
   }>({ recentSubmissions: [], activityRate: 0 })
   const [predictionAccuracy, setPredictionAccuracy] = useState<{ accuracy: number; totalPredictions: number }>({ accuracy: 0, totalPredictions: 0 })
+  const [pcaTopFeatures, setPcaTopFeatures] = useState<Array<{ feature: string; loading: number }>>([])
 
   // UI states
   const [modalOpen, setModalOpen] = useState(false)
@@ -529,17 +530,36 @@ export default function SpotifyDashboard() {
     }
   }
 
+  const fetchPcaTopFeatures = async () => {
+    try {
+      const resp = await fetch('/api/analysis/pca')
+      if (!resp.ok) return
+      const data = await resp.json()
+      const comp = Array.isArray(data.components) && data.components[0]
+      if (!comp || !Array.isArray(comp.features)) return
+      const top = [...comp.features]
+        .sort((a: any, b: any) => Math.abs(b.loading) - Math.abs(a.loading))
+        .slice(0, 3)
+        .map((f: any) => ({ feature: String(f.feature), loading: Number(f.loading) }))
+      setPcaTopFeatures(top)
+    } catch (e) {
+      console.debug('PCA fetch failed (ignored):', e)
+    }
+  }
+
   // Load initial data and set up auto-refresh
   useEffect(() => {
     fetchStats()
     fetchLiveFeed()
     fetchPredictionAccuracy()
+    fetchPcaTopFeatures()
 
     // Auto-refresh every 30 seconds
     const interval = setInterval(() => {
       fetchStats()
       fetchLiveFeed()
       fetchPredictionAccuracy()
+      fetchPcaTopFeatures()
     }, 30000)
 
     return () => clearInterval(interval)
@@ -1443,15 +1463,15 @@ export default function SpotifyDashboard() {
                       <div className="mt-4 space-y-2">
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-[var(--text-tertiary)]">Precision</span>
-                          <span className="text-[var(--text-secondary)]">0.71</span>
+                          <span className="text-[var(--text-secondary)]">{predictionAccuracy.totalPredictions > 0 ? '—' : 'N/A'}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-[var(--text-tertiary)]">Recall</span>
-                          <span className="text-[var(--text-secondary)]">0.68</span>
+                          <span className="text-[var(--text-secondary)]">{predictionAccuracy.totalPredictions > 0 ? '—' : 'N/A'}</span>
                         </div>
                         <div className="flex justify-between items-center text-xs">
                           <span className="text-[var(--text-tertiary)]">F1-Score</span>
-                          <span className="text-[var(--text-secondary)]">0.69</span>
+                          <span className="text-[var(--text-secondary)]">{predictionAccuracy.totalPredictions > 0 ? '—' : 'N/A'}</span>
                         </div>
                       </div>
                     </div>
@@ -1465,71 +1485,30 @@ export default function SpotifyDashboard() {
                       </div>
                     </div>
                     <div className="space-y-3">
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-[var(--text-secondary)]">Valence</span>
-                          <span className="text-sm font-medium text-[var(--accent-error)]">0.28</span>
-                        </div>
-                        <div className="w-full bg-[var(--surface-secondary)] rounded-full h-1.5">
-                          <div className="bg-[var(--accent-error)] h-1.5 rounded-full" style={{width: "28%"}}></div>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-[var(--text-secondary)]">Energy</span>
-                          <span className="text-sm font-medium text-[var(--accent-warning)]">0.24</span>
-                        </div>
-                        <div className="w-full bg-[var(--surface-secondary)] rounded-full h-1.5">
-                          <div className="bg-[var(--accent-warning)] h-1.5 rounded-full" style={{width: "24%"}}></div>
-                        </div>
-                      </div>
-                      <div className="space-y-2">
-                        <div className="flex justify-between items-center">
-                          <span className="text-sm text-[var(--text-secondary)]">Tempo</span>
-                          <span className="text-sm font-medium text-[var(--accent-primary)]">0.19</span>
-                        </div>
-                        <div className="w-full bg-[var(--surface-secondary)] rounded-full h-1.5">
-                          <div className="bg-[var(--accent-primary)] h-1.5 rounded-full" style={{width: "19%"}}></div>
-                        </div>
-                      </div>
+                      {pcaTopFeatures.length > 0 ? pcaTopFeatures.map((f, idx) => {
+                        const colors = ['accent-error', 'accent-warning', 'accent-primary']
+                        const color = colors[idx % colors.length]
+                        const width = Math.min(100, Math.round(Math.abs(f.loading) * 100))
+                        return (
+                          <div key={idx} className="space-y-2">
+                            <div className="flex justify-between items-center">
+                              <span className="text-sm text-[var(--text-secondary)]">{f.feature}</span>
+                              <span className={`text-sm font-medium text-[var(--${color})]`}>
+                                {f.loading > 0 ? '+' : ''}{f.loading.toFixed(2)}
+                              </span>
+                            </div>
+                            <div className="w-full bg-[var(--surface-secondary)] rounded-full h-1.5">
+                              <div className={`h-1.5 rounded-full bg-[var(--${color})]`} style={{ width: `${width}%` }}></div>
+                            </div>
+                          </div>
+                        )
+                      }) : (
+                        <div className="text-sm text-[var(--text-tertiary)]">No PCA feature loadings yet. Import data to see feature importance.</div>
+                      )}
                     </div>
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="p-4 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] text-center hover:bg-[var(--surface-elevated)] transition-all duration-300">
-                    <div className="text-2xl font-bold text-[var(--accent-success)] mb-1">CS</div>
-                    <div className="text-xs text-[var(--text-tertiary)]">Computer Science</div>
-                    <div className="text-sm text-[var(--text-secondary)] mt-2">High energy, electronic</div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] text-center hover:bg-[var(--surface-elevated)] transition-all duration-300">
-                    <div className="text-2xl font-bold text-[var(--accent-warning)] mb-1">ART</div>
-                    <div className="text-xs text-[var(--text-tertiary)]">Fine Arts</div>
-                    <div className="text-sm text-[var(--text-secondary)] mt-2">Creative, experimental</div>
-                  </div>
-                  <div className="p-4 rounded-xl bg-[var(--surface-tertiary)] border border-[var(--border-primary)] text-center hover:bg-[var(--surface-elevated)] transition-all duration-300">
-                    <div className="text-2xl font-bold text-[var(--accent-secondary)] mb-1">BIZ</div>
-                    <div className="text-xs text-[var(--text-tertiary)]">Business</div>
-                    <div className="text-sm text-[var(--text-secondary)] mt-2">Mainstream, upbeat</div>
-                  </div>
-                </div>
-
-                <div className="p-6 rounded-xl bg-gradient-to-r from-[var(--accent-warning)]/5 to-[var(--accent-error)]/5 border border-[var(--accent-warning)]/20">
-                  <div className="flex items-center gap-2 text-[var(--accent-warning)] text-sm font-medium mb-2">
-                    <Trophy className="h-4 w-4" />
-                    Latest Predictions
-                  </div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-secondary)]">&quot;Anti-Hero&quot; → Computer Science</span>
-                      <span className="text-[var(--accent-success)]">✓ Correct</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-[var(--text-secondary)]">&quot;Flowers&quot; → Psychology</span>
-                      <span className="text-[var(--accent-error)]">✗ Was Art</span>
-                    </div>
-                  </div>
-                </div>
               </CardContent>
             </Card>
           </TabsContent>
