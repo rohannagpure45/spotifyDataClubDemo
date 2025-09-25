@@ -94,9 +94,14 @@ export default function SpotifyDashboard() {
     topGenre: { name: string; percentage: number } | null
     averages: { energy: number; valence: number; danceability: number; tempo: number }
     extremes: {
-      mostEnergetic: { song: string; artist: string; energy: number; user: string } | null
-      happiest: { song: string; artist: string; valence: number; user: string } | null
-      mostDanceable: { song: string; artist: string; danceability: number; user: string } | null
+      mostEnergetic: { song: string; artist: string; energy: number; user: string; spotify?: { energy: number; valence: number; danceability: number; tempo: number } } | null
+      happiest: { song: string; artist: string; valence: number; user: string; spotify?: { energy: number; valence: number; danceability: number; tempo: number } } | null
+      mostDanceable: { song: string; artist: string; danceability: number; user: string; spotify?: { energy: number; valence: number; danceability: number; tempo: number } } | null
+    }
+    highlights?: {
+      mostDiverse: { user: string; genreCount: number } | null
+      tempoExtremist: { user: string; song: string; artist: string; tempo: number } | null
+      moodCurator: { user: string; song: string; artist: string; valence: number | null } | null
     }
   }>({
     totalSubmissions: 0,
@@ -104,7 +109,8 @@ export default function SpotifyDashboard() {
     topArtist: null,
     topGenre: null,
     averages: { energy: 0, valence: 0, danceability: 0, tempo: 0 },
-    extremes: { mostEnergetic: null, happiest: null, mostDanceable: null }
+    extremes: { mostEnergetic: null, happiest: null, mostDanceable: null },
+    highlights: undefined
   })
   const [liveFeed, setLiveFeed] = useState<{
     recentSubmissions: Array<{ name: string; song: string; artist: string; major: string; timeAgo: string }>
@@ -1136,7 +1142,7 @@ export default function SpotifyDashboard() {
                     </p>
                     <div className="mt-4 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                       <div className="w-1 h-1 rounded-full bg-[var(--accent-secondary)]"></div>
-                      5 clusters identified
+                      View real clusters from your data
                     </div>
                   </button>
 
@@ -1160,7 +1166,7 @@ export default function SpotifyDashboard() {
                     </p>
                     <div className="mt-4 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                       <div className="w-1 h-1 rounded-full bg-[var(--accent-primary)]"></div>
-                      12 major categories
+                      Heatmap based on imported data
                     </div>
                   </button>
 
@@ -1182,7 +1188,7 @@ export default function SpotifyDashboard() {
                     </p>
                     <div className="mt-4 flex items-center gap-2 text-xs text-[var(--text-tertiary)]">
                       <div className="w-1 h-1 rounded-full bg-[var(--spotify-green)]"></div>
-                      3D visualization ready
+                      3D visualization from your dataset
                     </div>
                   </button>
                 </div>
@@ -1195,16 +1201,16 @@ export default function SpotifyDashboard() {
                     </h4>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between py-2">
-                        <span className="text-sm text-[var(--text-secondary)]">Most predictive feature</span>
-                        <span className="text-sm font-medium text-[var(--accent-success)]">Valence (0.73 correlation)</span>
+                        <span className="text-sm text-[var(--text-secondary)]">Top Genre</span>
+                        <span className="text-sm font-medium text-[var(--accent-success)]">{stats.topGenre ? `${stats.topGenre.name} (${stats.topGenre.percentage}%)` : 'N/A'}</span>
                       </div>
                       <div className="flex items-center justify-between py-2">
-                        <span className="text-sm text-[var(--text-secondary)]">Cluster silhouette score</span>
-                        <span className="text-sm font-medium text-[var(--accent-primary)]">0.68 (Good)</span>
+                        <span className="text-sm text-[var(--text-secondary)]">Average Tempo</span>
+                        <span className="text-sm font-medium text-[var(--accent-primary)]">{stats.averages.tempo ? `${Math.round(stats.averages.tempo)} BPM` : 'N/A'}</span>
                       </div>
                       <div className="flex items-center justify-between py-2">
-                        <span className="text-sm text-[var(--text-secondary)]">Variance explained</span>
-                        <span className="text-sm font-medium text-[var(--accent-secondary)]">84.2% (3 components)</span>
+                        <span className="text-sm text-[var(--text-secondary)]">Total Submissions</span>
+                        <span className="text-sm font-medium text-[var(--accent-secondary)]">{stats.totalSubmissions}</span>
                       </div>
                     </div>
                   </div>
@@ -1567,9 +1573,20 @@ export default function SpotifyDashboard() {
                             &quot;{stats.extremes.mostEnergetic.song}&quot; by {stats.extremes.mostEnergetic.artist}
                           </p>
                           <div className="flex items-center justify-center gap-2">
-                            <div className="px-2 py-1 rounded-md bg-[var(--accent-warning)]/10 text-xs font-medium text-[var(--accent-warning)]">
-                              Energy: {stats.extremes.mostEnergetic.energy?.toFixed(2)}
-                            </div>
+                            {stats.extremes.mostEnergetic.spotify ? (
+                              <>
+                                <div className="px-2 py-1 rounded-md bg-[var(--accent-warning)]/10 text-xs font-medium text-[var(--accent-warning)]">
+                                  Energy (Spotify): {Number(stats.extremes.mostEnergetic.spotify.energy).toFixed(2)}
+                                </div>
+                                <div className="px-2 py-1 rounded-md bg-[var(--accent-primary)]/10 text-xs font-medium text-[var(--accent-primary)]">
+                                  Tempo: {Math.round(Number(stats.extremes.mostEnergetic.spotify.tempo))} BPM
+                                </div>
+                              </>
+                            ) : (
+                              <div className="px-2 py-1 rounded-md bg-[var(--accent-warning)]/10 text-xs font-medium text-[var(--accent-warning)]">
+                                Energy: {stats.extremes.mostEnergetic.energy?.toFixed(2)}
+                              </div>
+                            )}
                           </div>
                           <p className="text-xs text-[var(--text-tertiary)] mt-2">
                             Submitted by {stats.extremes.mostEnergetic.user}
@@ -1596,9 +1613,20 @@ export default function SpotifyDashboard() {
                             &quot;{stats.extremes.happiest.song}&quot; by {stats.extremes.happiest.artist}
                           </p>
                           <div className="flex items-center justify-center gap-2">
-                            <div className="px-2 py-1 rounded-md bg-[var(--accent-success)]/10 text-xs font-medium text-[var(--accent-success)]">
-                              Valence: {stats.extremes.happiest.valence?.toFixed(2)}
-                            </div>
+                            {stats.extremes.happiest.spotify ? (
+                              <>
+                                <div className="px-2 py-1 rounded-md bg-[var(--accent-success)]/10 text-xs font-medium text-[var(--accent-success)]">
+                                  Valence (Spotify): {Number(stats.extremes.happiest.spotify.valence).toFixed(2)}
+                                </div>
+                                <div className="px-2 py-1 rounded-md bg-[var(--accent-primary)]/10 text-xs font-medium text-[var(--accent-primary)]">
+                                  Tempo: {Math.round(Number(stats.extremes.happiest.spotify.tempo))} BPM
+                                </div>
+                              </>
+                            ) : (
+                              <div className="px-2 py-1 rounded-md bg-[var(--accent-success)]/10 text-xs font-medium text-[var(--accent-success)]">
+                                Valence: {stats.extremes.happiest.valence?.toFixed(2)}
+                              </div>
+                            )}
                           </div>
                           <p className="text-xs text-[var(--text-tertiary)] mt-2">
                             Submitted by {stats.extremes.happiest.user}
@@ -1625,9 +1653,20 @@ export default function SpotifyDashboard() {
                             &quot;{stats.extremes.mostDanceable.song}&quot; by {stats.extremes.mostDanceable.artist}
                           </p>
                           <div className="flex items-center justify-center gap-2">
-                            <div className="px-2 py-1 rounded-md bg-[var(--accent-secondary)]/10 text-xs font-medium text-[var(--accent-secondary)]">
-                              Danceability: {stats.extremes.mostDanceable.danceability?.toFixed(2)}
-                            </div>
+                            {stats.extremes.mostDanceable.spotify ? (
+                              <>
+                                <div className="px-2 py-1 rounded-md bg-[var(--accent-secondary)]/10 text-xs font-medium text-[var(--accent-secondary)]">
+                                  Danceability (Spotify): {Number(stats.extremes.mostDanceable.spotify.danceability).toFixed(2)}
+                                </div>
+                                <div className="px-2 py-1 rounded-md bg-[var(--accent-primary)]/10 text-xs font-medium text-[var(--accent-primary)]">
+                                  Tempo: {Math.round(Number(stats.extremes.mostDanceable.spotify.tempo))} BPM
+                                </div>
+                              </>
+                            ) : (
+                              <div className="px-2 py-1 rounded-md bg-[var(--accent-secondary)]/10 text-xs font-medium text-[var(--accent-secondary)]">
+                                Danceability: {stats.extremes.mostDanceable.danceability?.toFixed(2)}
+                              </div>
+                            )}
                           </div>
                           <p className="text-xs text-[var(--text-tertiary)] mt-2">
                             Submitted by {stats.extremes.mostDanceable.user}
@@ -1720,15 +1759,33 @@ export default function SpotifyDashboard() {
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
                     <div className="text-center">
                       <div className="text-[var(--text-primary)] font-medium">Most Diverse Taste</div>
-                      <div className="text-[var(--text-secondary)]">Mike - 8 different genres</div>
+                      <div className="text-[var(--text-secondary)]">
+                        {stats?.highlights?.mostDiverse ? (
+                          <>
+                            {stats.highlights.mostDiverse.user} - {stats.highlights.mostDiverse.genreCount} genres
+                          </>
+                        ) : 'N/A'}
+                      </div>
                     </div>
                     <div className="text-center">
                       <div className="text-[var(--text-primary)] font-medium">Tempo Extremist</div>
-                      <div className="text-[var(--text-secondary)]">Luna - 200 BPM electronic</div>
+                      <div className="text-[var(--text-secondary)]">
+                        {stats?.highlights?.tempoExtremist ? (
+                          <>
+                            {stats.highlights.tempoExtremist.user} - {stats.highlights.tempoExtremist.song} ({Math.round(stats.highlights.tempoExtremist.tempo)} BPM)
+                          </>
+                        ) : 'N/A'}
+                      </div>
                     </div>
                     <div className="text-center">
                       <div className="text-[var(--text-primary)] font-medium">Mood Curator</div>
-                      <div className="text-[var(--text-secondary)]">Jordan - Perfect 0.5 valence</div>
+                      <div className="text-[var(--text-secondary)]">
+                        {stats?.highlights?.moodCurator ? (
+                          <>
+                            {stats.highlights.moodCurator.user} - {stats.highlights.moodCurator.song} (valence {Number(stats.highlights.moodCurator.valence || 0).toFixed(2)})
+                          </>
+                        ) : 'N/A'}
+                      </div>
                     </div>
                   </div>
                 </div>

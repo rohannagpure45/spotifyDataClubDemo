@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getFeatureRows, pca as doPCA, featureNames } from '@/lib/analysis'
 
 interface PCAResult {
   components: {
@@ -18,63 +19,41 @@ interface PCAResult {
 }
 
 export async function GET() {
-  const result: PCAResult = {
-    components: [
-      {
-        name: 'PC1: Energy Axis',
-        variance: 0.35,
-        features: [
-          { feature: 'Energy', loading: 0.89 },
-          { feature: 'Danceability', loading: 0.75 },
-          { feature: 'Acousticness', loading: -0.68 }
-        ]
-      },
-      {
-        name: 'PC2: Mood Axis',
-        variance: 0.28,
-        features: [
-          { feature: 'Valence', loading: 0.82 },
-          { feature: 'Mode', loading: 0.65 },
-          { feature: 'Speechiness', loading: -0.45 }
-        ]
-      },
-      {
-        name: 'PC3: Tempo Axis',
-        variance: 0.21,
-        features: [
-          { feature: 'Tempo', loading: 0.78 },
-          { feature: 'Instrumentalness', loading: 0.62 },
-          { feature: 'Loudness', loading: 0.42 }
-        ]
-      }
-    ],
-    musicDNA: [
-      {
-        userId: 'user-1',
-        username: 'Alex Chen',
-        coordinates: [0.75, 0.45, 0.22],
-        dominantTraits: ['High Energy', 'Positive Mood', 'Vocal-focused']
-      },
-      {
-        userId: 'user-2',
-        username: 'Sarah Johnson',
-        coordinates: [-0.32, 0.68, 0.15],
-        dominantTraits: ['Mellow', 'Upbeat', 'Balanced Complexity']
-      },
-      {
-        userId: 'user-3',
-        username: 'Mike Davis',
-        coordinates: [0.55, -0.28, 0.72],
-        dominantTraits: ['Energetic', 'Melancholic', 'Instrumental']
-      },
-      {
-        userId: 'user-4',
-        username: 'Emma Wilson',
-        coordinates: [-0.48, -0.15, -0.35],
-        dominantTraits: ['Acoustic', 'Contemplative', 'Simple Structure']
-      }
-    ]
-  }
+  try {
+    const rows = await getFeatureRows()
+    const X = rows.map(r => r.features)
+    const names = featureNames()
+    if (X.length === 0) return NextResponse.json({ components: [], musicDNA: [] })
 
-  return NextResponse.json(result)
+    const { components, explained, scores } = doPCA(X, 3)
+
+    const compPayload = components.map((vec, i) => ({
+      name: `PC${i + 1}`,
+      variance: Number((explained[i] || 0).toFixed(2)),
+      features: vec.map((loading, j) => ({ feature: names[j], loading: Number(loading.toFixed(2)) })),
+    }))
+
+    // Limit to top N users for visualization to keep payload reasonable
+    const MAX_USERS = 250
+    const musicDNA = rows.slice(0, MAX_USERS).map((row, idx) => {
+      const p = scores[idx] || [0, 0, 0]
+      const coords: [number, number, number] = [Number((p[0] || 0).toFixed(2)), Number((p[1] || 0).toFixed(2)), Number((p[2] || 0).toFixed(2))]
+      const dom: string[] = []
+      if ((p[0] || 0) > 0.5) dom.push('Energy')
+      if ((p[1] || 0) > 0.5) dom.push('Mood')
+      if ((p[2] || 0) > 0.5) dom.push('Tempo')
+      return {
+        userId: row.userId,
+        username: row.username,
+        coordinates: coords,
+        dominantTraits: dom,
+      }
+    })
+
+    const result: PCAResult = { components: compPayload, musicDNA }
+    return NextResponse.json(result)
+  } catch (e) {
+    console.error('pca analysis failed', e)
+    return NextResponse.json({ components: [], musicDNA: [], error: 'Failed to compute PCA' }, { status: 500 })
+  }
 }
