@@ -17,7 +17,10 @@ async function getAccessToken(): Promise<string | null> {
     },
     body: body.toString(),
   })
-  if (!resp.ok) return null
+  if (!resp.ok) {
+    try { console.warn('Spotify token error:', resp.status, await resp.text()) } catch {}
+    return null
+  }
   const data = (await resp.json()) as TokenResponse
   cachedToken = {
     token: data.access_token,
@@ -37,17 +40,36 @@ type SpotifySearchResponse = { tracks: { items: Array<{ id: string }> } }
 type SpotifyAudioFeaturesWire = { id?: string; energy?: number; valence?: number; danceability?: number; tempo?: number }
 type SpotifyAudioFeaturesBatchResponse = { audio_features: SpotifyAudioFeaturesWire[] }
 
+function cleanTitle(s: string): string {
+  return s
+    .replace(/\(feat\.[^)]*\)/gi, '')
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/-\s*(Remaster(ed)?(\s*\d{4})?|Live|Version|Single|Radio Edit)/gi, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export async function fetchAudioFeaturesFor(song: string, artist?: string): Promise<AudioFeatures | null> {
   const token = await getAccessToken()
   if (!token) return null
-  const q = artist ? `track:${song} artist:${artist}` : song
-  const encoded = encodeURIComponent(q)
-  const searchUrl = `https://api.spotify.com/v1/search?q=${encoded}&type=track&limit=1`
+  const title = cleanTitle(song)
+  const artistClean = artist ? cleanTitle(artist) : undefined
+  const queries = [
+    artistClean ? `track:"${title}" artist:"${artistClean}"` : `track:"${title}"`,
+    artistClean ? `${title} ${artistClean}` : title,
+    title,
+  ]
   const headers = { Authorization: `Bearer ${token}` }
-  const sresp = await fetch(searchUrl, { headers })
-  if (!sresp.ok) return null
-  const sdata = await sresp.json() as SpotifySearchResponse
-  const id = sdata.tracks?.items?.[0]?.id
+  let id: string | undefined
+  for (const q of queries) {
+    const encoded = encodeURIComponent(q)
+    const searchUrl = `https://api.spotify.com/v1/search?q=${encoded}&type=track&limit=1&market=US`
+    const sresp = await fetch(searchUrl, { headers })
+    if (!sresp.ok) continue
+    const sdata = await sresp.json() as SpotifySearchResponse
+    id = sdata.tracks?.items?.[0]?.id
+    if (id) break
+  }
   if (!id) return null
   const featuresUrl = `https://api.spotify.com/v1/audio-features/${id}`
   const fresp = await fetch(featuresUrl, { headers })
@@ -64,13 +86,23 @@ export async function fetchAudioFeaturesFor(song: string, artist?: string): Prom
 export async function searchTrackId(song: string, artist?: string): Promise<string | null> {
   const token = await getAccessToken()
   if (!token) return null
-  const q = artist ? `track:${song} artist:${artist}` : song
-  const encoded = encodeURIComponent(q)
-  const url = `https://api.spotify.com/v1/search?q=${encoded}&type=track&limit=1`
-  const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-  if (!resp.ok) return null
-  const data = await resp.json() as SpotifySearchResponse
-  return data.tracks?.items?.[0]?.id ?? null
+  const title = cleanTitle(song)
+  const artistClean = artist ? cleanTitle(artist) : undefined
+  const queries = [
+    artistClean ? `track:"${title}" artist:"${artistClean}"` : `track:"${title}"`,
+    artistClean ? `${title} ${artistClean}` : title,
+    title,
+  ]
+  for (const q of queries) {
+    const encoded = encodeURIComponent(q)
+    const url = `https://api.spotify.com/v1/search?q=${encoded}&type=track&limit=1&market=US`
+    const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
+    if (!resp.ok) continue
+    const data = await resp.json() as SpotifySearchResponse
+    const id = data.tracks?.items?.[0]?.id
+    if (id) return id
+  }
+  return null
 }
 
 export async function fetchAudioFeaturesBatch(ids: string[]): Promise<Record<string, AudioFeatures>> {

@@ -45,18 +45,19 @@ export async function POST(request: Request) {
   })
 
   // Map unique track queries → indices and ids
-  const key = (s: { songName: string; artistName: string }) => `${(s.songName || '').trim().toLowerCase()}|${(s.artistName || '').trim().toLowerCase()}`
-  const uniqueMap = new Map<string, { song: string; artist: string; ids: string[]; rows: number[]; trackId?: string | null }>()
+  const key = (s: { songName: string; artistName: string | null }) => `${(s.songName || '').trim().toLowerCase()}|${(s.artistName || '').trim().toLowerCase()}`
+  const uniqueMap = new Map<string, { song: string; artist: string | null; ids: string[]; rows: number[]; trackId?: string | null }>()
   submissions.forEach((s, i) => {
-    const k = key(s)
-    if (!uniqueMap.has(k)) uniqueMap.set(k, { song: s.songName, artist: s.artistName, ids: [], rows: [] })
+    const artist = (s.artistName || '').split(',')[0]?.trim() || null
+    const k = key({ songName: s.songName, artistName: artist })
+    if (!uniqueMap.has(k)) uniqueMap.set(k, { song: s.songName, artist, ids: [], rows: [] })
     uniqueMap.get(k)!.rows.push(i)
   })
 
   // Search track IDs
   let searchCount = 0
   for (const item of uniqueMap.values()) {
-    const id = await searchTrackId(item.song, item.artist)
+    const id = await searchTrackId(item.song, item.artist || undefined)
     item.trackId = id || null
     if (id) searchCount++
   }
@@ -98,5 +99,5 @@ export async function POST(request: Request) {
     updatedRows: updated,
     notFound
   })
+export const runtime = 'nodejs'
 }
-
