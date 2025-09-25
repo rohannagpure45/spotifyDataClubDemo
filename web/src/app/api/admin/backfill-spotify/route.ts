@@ -92,13 +92,13 @@ export async function POST(request: Request) {
       notFound += item.rows.length
       continue
     }
-    console.log(`Processing ${item.rows.length} rows for "${item.song}" with features: energy=${f.energy}, valence=${f.valence}, danceability=${f.danceability}, tempo=${f.tempo}`)
+    console.log(`Processing ${item.rows.length} rows for "${item.song}" with features: energy=${f.energy}, valence=${f.valence}, danceability=${f.danceability}, acousticness=${f.acousticness}, tempo=${f.tempo}`)
     for (const rowIdx of item.rows) {
       const s = submissions[rowIdx]
       // Only update if force or fields missing or placeholder values
-      const isPlaceholder = s.energy === 0.5 && s.valence === 0.5 && s.danceability === 0.5 && s.tempo === 120
-      const shouldUpdate = force || s.energy == null || s.valence == null || s.danceability == null || s.tempo == null || isPlaceholder
-      console.log(`Row ${s.id}: current values [${s.energy}, ${s.valence}, ${s.danceability}, ${s.tempo}], isPlaceholder=${isPlaceholder}, force=${force}, shouldUpdate=${shouldUpdate}`)
+      const isPlaceholder = s.energy === 0.5 && s.valence === 0.5 && s.danceability === 0.5 && s.acousticness === 0.5 && s.tempo === 120
+      const shouldUpdate = force || s.energy == null || s.valence == null || s.danceability == null || s.acousticness == null || s.tempo == null || isPlaceholder
+      console.log(`Row ${s.id}: current values [${s.energy}, ${s.valence}, ${s.danceability}, ${s.acousticness}, ${s.tempo}], isPlaceholder=${isPlaceholder}, force=${force}, shouldUpdate=${shouldUpdate}`)
       if (!shouldUpdate) continue
       await prisma.musicSubmission.update({
         where: { id: s.id },
@@ -106,6 +106,7 @@ export async function POST(request: Request) {
           energy: f.energy,
           valence: f.valence,
           danceability: f.danceability,
+          acousticness: f.acousticness,
           tempo: f.tempo,
         }
       })

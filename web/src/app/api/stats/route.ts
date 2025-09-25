@@ -123,15 +123,15 @@ export async function GET() {
     try {
       if (mostEnergetic) {
         const f = await fetchAudioFeaturesFor(mostEnergetic.songName, mostEnergetic.artistName)
-        if (f) spotifyMostEnergetic = { energy: f.energy, valence: f.valence, danceability: f.danceability, tempo: f.tempo }
+        if (f) spotifyMostEnergetic = { energy: f.energy, valence: f.valence, danceability: f.danceability, acousticness: f.acousticness, tempo: f.tempo }
       }
       if (happiest) {
         const f = await fetchAudioFeaturesFor(happiest.songName, happiest.artistName)
-        if (f) spotifyHappiest = { energy: f.energy, valence: f.valence, danceability: f.danceability, tempo: f.tempo }
+        if (f) spotifyHappiest = { energy: f.energy, valence: f.valence, danceability: f.danceability, acousticness: f.acousticness, tempo: f.tempo }
       }
       if (mostDanceable) {
         const f = await fetchAudioFeaturesFor(mostDanceable.songName, mostDanceable.artistName)
-        if (f) spotifyMostDanceable = { energy: f.energy, valence: f.valence, danceability: f.danceability, tempo: f.tempo }
+        if (f) spotifyMostDanceable = { energy: f.energy, valence: f.valence, danceability: f.danceability, acousticness: f.acousticness, tempo: f.tempo }
       }
     } catch {
       // If Spotify is not configured or rate-limited, silently continue

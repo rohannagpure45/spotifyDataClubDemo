@@ -1009,6 +1009,7 @@ export async function POST(request: Request) {
                 energy: f.energy,
                 valence: f.valence,
                 danceability: f.danceability,
+                acousticness: f.acousticness,
                 tempo: f.tempo,
               }
             })

@@ -33,11 +33,12 @@ export type AudioFeatures = {
   energy: number
   valence: number
   danceability: number
+  acousticness: number
   tempo: number
 }
 
 type SpotifySearchResponse = { tracks: { items: Array<{ id: string }> } }
-type SpotifyAudioFeaturesWire = { id?: string; energy?: number; valence?: number; danceability?: number; tempo?: number }
+type SpotifyAudioFeaturesWire = { id?: string; energy?: number; valence?: number; danceability?: number; acousticness?: number; tempo?: number }
 type SpotifyAudioFeaturesBatchResponse = { audio_features: SpotifyAudioFeaturesWire[] }
 
 function cleanTitle(s: string): string {
@@ -79,6 +80,7 @@ export async function fetchAudioFeaturesFor(song: string, artist?: string): Prom
     energy: Number(fdata.energy ?? NaN),
     valence: Number(fdata.valence ?? NaN),
     danceability: Number(fdata.danceability ?? NaN),
+    acousticness: Number(fdata.acousticness ?? NaN),
     tempo: Number(fdata.tempo ?? NaN),
   }
 }
@@ -119,24 +121,24 @@ function generateRealisticFeatures(trackId: string, trackInfo?: { name?: string;
   const artist = trackInfo?.artist?.toLowerCase() || ''
   const name = trackInfo?.name?.toLowerCase() || ''
 
-  let baseEnergy = 0.5, baseValence = 0.5, baseDance = 0.5, baseTempo = 120
+  let baseEnergy = 0.5, baseValence = 0.5, baseDance = 0.5, baseAcoustic = 0.5, baseTempo = 120
 
   // Genre patterns
   if (genre.includes('house') || genre.includes('electronic') || genre.includes('edm')) {
-    baseEnergy = 0.8; baseDance = 0.9; baseTempo = 128
+    baseEnergy = 0.8; baseDance = 0.9; baseAcoustic = 0.1; baseTempo = 128
   } else if (genre.includes('rock') || genre.includes('metal')) {
-    baseEnergy = 0.9; baseValence = 0.6; baseTempo = 140
+    baseEnergy = 0.9; baseValence = 0.6; baseAcoustic = 0.2; baseTempo = 140
   } else if (genre.includes('jazz') || genre.includes('blues')) {
-    baseEnergy = 0.4; baseValence = 0.4; baseTempo = 90
+    baseEnergy = 0.4; baseValence = 0.4; baseAcoustic = 0.8; baseTempo = 90
   } else if (genre.includes('pop')) {
-    baseEnergy = 0.7; baseValence = 0.8; baseDance = 0.8; baseTempo = 125
+    baseEnergy = 0.7; baseValence = 0.8; baseDance = 0.8; baseAcoustic = 0.3; baseTempo = 125
   } else if (genre.includes('classical')) {
-    baseEnergy = 0.3; baseValence = 0.5; baseDance = 0.2; baseTempo = 80
+    baseEnergy = 0.3; baseValence = 0.5; baseDance = 0.2; baseAcoustic = 0.9; baseTempo = 80
   }
 
   // Artist-specific adjustments
   if (artist.includes('nimino')) {
-    baseEnergy = 0.6; baseValence = 0.7; baseDance = 0.7; baseTempo = 110
+    baseEnergy = 0.6; baseValence = 0.7; baseDance = 0.7; baseAcoustic = 0.4; baseTempo = 110
   }
 
   // Add realistic variation
@@ -144,6 +146,7 @@ function generateRealisticFeatures(trackId: string, trackInfo?: { name?: string;
     energy: Math.max(0, Math.min(1, baseEnergy + random(-0.2, 0.2))),
     valence: Math.max(0, Math.min(1, baseValence + random(-0.2, 0.2))),
     danceability: Math.max(0, Math.min(1, baseDance + random(-0.2, 0.2))),
+    acousticness: Math.max(0, Math.min(1, baseAcoustic + random(-0.2, 0.2))),
     tempo: Math.max(60, Math.min(200, Math.round(baseTempo + random(-30, 30))))
   }
 }
@@ -163,7 +166,7 @@ export async function fetchAudioFeaturesBatch(ids: string[]): Promise<Record<str
       for (const id of chunk) {
         if (id) {
           out[id] = generateRealisticFeatures(id)
-          console.log(`Generated realistic features for track ${id}: energy=${out[id].energy}, valence=${out[id].valence}, danceability=${out[id].danceability}, tempo=${out[id].tempo}`)
+          console.log(`Generated realistic features for track ${id}: energy=${out[id].energy}, valence=${out[id].valence}, danceability=${out[id].danceability}, acousticness=${out[id].acousticness}, tempo=${out[id].tempo}`)
         }
       }
       continue
@@ -184,6 +187,7 @@ export async function fetchAudioFeaturesBatch(ids: string[]): Promise<Record<str
         energy: Number(f.energy ?? NaN),
         valence: Number(f.valence ?? NaN),
         danceability: Number(f.danceability ?? NaN),
+        acousticness: Number(f.acousticness ?? NaN),
         tempo: Number(f.tempo ?? NaN),
       }
       console.log(`Using real Spotify features for track ${f.id}`)
