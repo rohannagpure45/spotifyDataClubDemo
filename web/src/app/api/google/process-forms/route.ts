@@ -14,12 +14,12 @@ interface ProcessedMember {
   id: string
   userId?: string
   name: string
-  email: string
+  email?: string
   major: string
-  year: string
+  year?: string
   musicProfile: {
     topGenres: string[]
-    topArtists: string[]
+    topArtists?: string[]
     preferenceVector: number[]
     listeningStyle: string
   }
@@ -884,7 +884,7 @@ export async function POST(request: Request) {
     }
 
     // Process the responses
-    let members = processFormResponses(responses)
+    let members: ProcessedMember[] = processFormResponses(responses)
 
     // Calculate compatibilities
     calculateCompatibilities(members)
@@ -975,7 +975,7 @@ export async function POST(request: Request) {
     }
 
     // Form optimized groups
-    let groups = formOptimizedGroups(members, groupSize)
+    let groups: OptimizedGroup[] = formOptimizedGroups(members, groupSize)
 
     // (Saving groups moved to after Spotify sync and DB-based rebuild)
 
@@ -1050,7 +1050,7 @@ export async function POST(request: Request) {
         data: {
           userId: session.user.id,
           name: group.name,
-          members: JSON.stringify(group.members.map(m => ({
+          members: JSON.stringify(group.members.map((m: ProcessedMember) => ({
             userId: m.userId ?? m.id,
             name: m.name,
             major: m.major,
