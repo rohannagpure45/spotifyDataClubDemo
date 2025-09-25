@@ -4,6 +4,8 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { searchTrackId, fetchAudioFeaturesBatch } from '@/lib/spotify'
 
+export const runtime = 'nodejs'
+
 type Summary = {
   totalSubmissions: number
   distinctTracks: number
@@ -99,5 +101,4 @@ export async function POST(request: Request) {
     updatedRows: updated,
     notFound
   })
-export const runtime = 'nodejs'
 }
