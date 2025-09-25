@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Spotify Favorites Analysis - A data science demonstration app that predicts college majors from music preferences using Spotify API data and machine learning. Built for live presentations at Data Science Club meetings.
 
-**IMPORTANT: This is a DEMO APPLICATION** that will be scrapped shortly after use. Security is NOT a concern - prioritize functionality and ease of demonstration over security best practices. Use simple authentication and basic data storage solutions.
+**IMPORTANT: This is a PRODUCTION DEMO APPLICATION** deployed on Vercel for live presentation. Multiple users will access the live website simultaneously during the demo. The application uses a cloud PostgreSQL database for concurrent user support and real-time data updates.
 
 ## Essential Commands
 
@@ -43,10 +43,10 @@ make docker-run
 6. **Export** → CSV download functionality for administrators
 
 ### Authentication System
-- **Database**: SQLite with Prisma ORM for simplicity (demo-appropriate)
+- **Database**: PostgreSQL cloud database with Prisma ORM for production deployment
 - **Auth**: NextAuth.js with simple email/password credentials
 - **User Mapping**: Auto-creates accounts when processing Google Forms by email
-- **Security**: Minimal for demo purposes - uses basic password hashing
+- **Admin Access**: Restricted to specific email addresses for database management
 
 ### Key Components
 
@@ -64,7 +64,8 @@ make docker-run
 
 **Database** (`prisma/`):
 - `schema.prisma`: User, form responses, groups, and analysis data models
-- SQLite database with auto-generated migrations
+- PostgreSQL cloud database with auto-generated migrations
+- Connection via `DATABASE_URL` environment variable
 
 **Components** (`web/src/components/`):
 - `GroupFormProcessor.tsx`: Main interface for Google Forms processing
@@ -206,7 +207,35 @@ Group names are generated using realistic patterns:
 #### API Endpoints
 - `/api/groups/create` - POST: Creates new groups from real user data
 - `/api/groups` - GET: Retrieves user's saved groups (no public groups)
+- `/api/admin/reset` - POST: Admin-only endpoint to clear all demo data quickly
 - Requires authentication for all operations
+
+### Database Management for Demo
+
+#### Production Deployment Setup
+- **Vercel Deployment**: Live production application accessible by multiple concurrent users
+- **Cloud PostgreSQL**: Persistent database for real-time data sharing
+- **Environment Variables**: `DATABASE_URL` configured in Vercel dashboard
+
+#### Quick Reset Workflow
+Before each demo session:
+1. **Admin Login**: Log in with authorized admin email (nagpure.r@northeastern.edu)
+2. **Database Reset**: Call `/api/admin/reset` endpoint to clear all data
+3. **Fresh Start**: Database is empty and ready for new Google Forms import
+4. **Live Demo**: Import real participant data and demonstrate real-time features
+
+#### Data Flow Process
+1. **Pre-Demo**: Database is cleared of any previous demo data
+2. **Data Import**: Upload Google Sheets/CSV with participant music preferences
+3. **Live Updates**: Dashboard shows real submissions with 30-second auto-refresh
+4. **Group Formation**: Create optimized groups from real participant data
+5. **Real-time Display**: Multiple users can view live statistics and groups simultaneously
+
+#### Admin Capabilities
+- Database reset without losing admin accounts
+- Quick data clearing for demo preparation
+- Monitoring of total users, submissions, and groups
+- CSV export functionality for post-demo analysis
 
 ## Key Files Reference
 

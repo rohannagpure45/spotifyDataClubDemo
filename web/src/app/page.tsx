@@ -426,7 +426,7 @@ export default function SpotifyDashboard() {
 
     const fetchSaved = async () => {
       try {
-        const resp = await fetch('/api/groups?limit=50&public=true')
+        const resp = await fetch('/api/groups?limit=50')
         if (!resp.ok) return
         const payload = await resp.json()
         if (aborted) return
@@ -906,7 +906,7 @@ export default function SpotifyDashboard() {
                       Analyzing music preferences and creating optimal groups...
                     </div>
                   )}
-                  {groups.length > 0 && (
+                  {groups.length > 0 ? (
                     <div className="mt-6 space-y-4">
                       <div className="flex items-center justify-between">
                         <h4 className="font-semibold text-[var(--text-primary)] flex items-center gap-2">
@@ -978,6 +978,17 @@ export default function SpotifyDashboard() {
                         >
                           Reshuffle Groups
                         </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="mt-6 p-6 text-center rounded-xl bg-[var(--surface-tertiary)]/30 border border-[var(--border-primary)]">
+                      <Users2 className="h-12 w-12 text-[var(--text-tertiary)] mx-auto mb-3" />
+                      <h4 className="text-lg font-semibold text-[var(--text-primary)] mb-2">No Groups Yet</h4>
+                      <p className="text-sm text-[var(--text-secondary)] mb-4">
+                        Import data from Google Sheets or upload a CSV file, then click &ldquo;Form Groups&rdquo; to create optimized music groups.
+                      </p>
+                      <div className="text-xs text-[var(--text-tertiary)]">
+                        Groups will appear here once you have music submission data to analyze.
                       </div>
                     </div>
                   )}
