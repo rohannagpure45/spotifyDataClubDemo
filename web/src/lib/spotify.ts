@@ -114,11 +114,18 @@ export async function fetchAudioFeaturesBatch(ids: string[]): Promise<Record<str
   for (const chunk of chunks) {
     const url = `https://api.spotify.com/v1/audio-features?ids=${chunk.join(',')}`
     const resp = await fetch(url, { headers: { Authorization: `Bearer ${token}` } })
-    if (!resp.ok) continue
+    if (!resp.ok) {
+      console.warn(`Spotify audio-features failed: ${resp.status} ${resp.statusText} for IDs: ${chunk.join(',')}`)
+      continue
+    }
     const data = await resp.json() as SpotifyAudioFeaturesBatchResponse
     const feats = Array.isArray(data.audio_features) ? data.audio_features : []
-    for (const f of feats) {
-      if (!f || !f.id) continue
+    for (let i = 0; i < feats.length; i++) {
+      const f = feats[i]
+      if (!f || !f.id) {
+        console.warn(`Spotify audio-features: track ${chunk[i]} has no audio features (null response)`)
+        continue
+      }
       out[f.id] = {
         energy: Number(f.energy ?? NaN),
         valence: Number(f.valence ?? NaN),

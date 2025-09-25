@@ -59,27 +59,46 @@ export async function POST(request: Request) {
   // Search track IDs
   let searchCount = 0
   for (const item of uniqueMap.values()) {
+    console.log(`Searching for: "${item.song}" by "${item.artist}"`)
     const id = await searchTrackId(item.song, item.artist || undefined)
     item.trackId = id || null
-    if (id) searchCount++
+    if (id) {
+      console.log(`Found track ID: ${id}`)
+      searchCount++
+    } else {
+      console.log(`No track found for: "${item.song}" by "${item.artist}"`)
+    }
   }
 
   // Batch fetch features
   const allIds = Array.from(uniqueMap.values()).map(x => x.trackId).filter(Boolean) as string[]
+  console.log(`Fetching audio features for ${allIds.length} track IDs: ${allIds.join(', ')}`)
   const featureMap = await fetchAudioFeaturesBatch(allIds)
+  console.log(`Received audio features for ${Object.keys(featureMap).length} tracks: ${Object.keys(featureMap).join(', ')}`)
 
   // Update DB rows
   let updated = 0
   let notFound = 0
   for (const item of uniqueMap.values()) {
     const id = item.trackId
-    if (!id) { notFound += item.rows.length; continue }
+    if (!id) {
+      console.log(`No track ID for "${item.song}" - skipping ${item.rows.length} rows`)
+      notFound += item.rows.length
+      continue
+    }
     const f = featureMap[id]
-    if (!f) { notFound += item.rows.length; continue }
+    if (!f) {
+      console.log(`No audio features found for track ID ${id} ("${item.song}") - skipping ${item.rows.length} rows`)
+      notFound += item.rows.length
+      continue
+    }
+    console.log(`Processing ${item.rows.length} rows for "${item.song}" with features: energy=${f.energy}, valence=${f.valence}, danceability=${f.danceability}, tempo=${f.tempo}`)
     for (const rowIdx of item.rows) {
       const s = submissions[rowIdx]
-      // Only update if force or fields missing
-      const shouldUpdate = force || s.energy == null || s.valence == null || s.danceability == null || s.tempo == null
+      // Only update if force or fields missing or placeholder values
+      const isPlaceholder = s.energy === 0.5 && s.valence === 0.5 && s.danceability === 0.5 && s.tempo === 120
+      const shouldUpdate = force || s.energy == null || s.valence == null || s.danceability == null || s.tempo == null || isPlaceholder
+      console.log(`Row ${s.id}: current values [${s.energy}, ${s.valence}, ${s.danceability}, ${s.tempo}], isPlaceholder=${isPlaceholder}, force=${force}, shouldUpdate=${shouldUpdate}`)
       if (!shouldUpdate) continue
       await prisma.musicSubmission.update({
         where: { id: s.id },
@@ -90,6 +109,7 @@ export async function POST(request: Request) {
           tempo: f.tempo,
         }
       })
+      console.log(`Updated row ${s.id} with Spotify features`)
       updated++
     }
   }
