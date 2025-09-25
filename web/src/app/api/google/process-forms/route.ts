@@ -5,6 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
 import { calculateCompatibilities as calcCompat, formOptimizedGroups as formGroups, generateCSV as genCSV } from '@/lib/music-utils'
+import { searchTrackId, fetchAudioFeaturesBatch } from '@/lib/spotify'
 import * as XLSX from 'xlsx'
 
 // (Removed unused FormResponse interface to satisfy lint)
@@ -888,6 +889,7 @@ export async function POST(request: Request) {
     calcCompat(members)
 
     // Create users for all email addresses in responses and store form data
+    const touchedSubmissions: Array<{ id: string; userId: string; song: string; artist: string }> = []
     for (let i = 0; i < (responses as FormRow[]).length; i++) {
       const response = (responses as FormRow[])[i]
       const rawEmail = getStr(response, 'email')
@@ -917,6 +919,7 @@ export async function POST(request: Request) {
         const favorite_artists = getStr(response, 'favorite_artists')
         const genresStr = getStr(response, 'genres')
         if (favorite_artists || genresStr) {
+          const artistFirst = favorite_artists ? favorite_artists.split(',').map(s => s.trim()).filter(Boolean)[0] || 'Unknown' : 'Unknown'
           const existingSubmission = await prisma.musicSubmission.findFirst({
             where: {
               userId: user.id,
@@ -925,11 +928,11 @@ export async function POST(request: Request) {
           })
 
           if (!existingSubmission) {
-            await prisma.musicSubmission.create({
+            const created = await prisma.musicSubmission.create({
               data: {
                 userId: user.id,
                 songName: getStr(response, 'favorite_song') || 'Unknown',
-                artistName: favorite_artists || 'Unknown',
+                artistName: artistFirst,
                 genres: JSON.stringify(genresStr ? String(genresStr).split(',') : []),
                 energy: parseFloat(getStr(response, 'energy') || '0.5'),
                 valence: parseFloat(getStr(response, 'valence') || '0.5'),
@@ -938,6 +941,9 @@ export async function POST(request: Request) {
                 tempo: parseFloat(getStr(response, 'tempo') || '120')
               }
             })
+            touchedSubmissions.push({ id: created.id, userId: user.id, song: created.songName, artist: created.artistName })
+          } else {
+            touchedSubmissions.push({ id: existingSubmission.id, userId: user.id, song: existingSubmission.songName, artist: existingSubmission.artistName })
           }
         }
       } catch (e) {
@@ -963,7 +969,65 @@ export async function POST(request: Request) {
     }
 
     // Form optimized groups (shared util)
-    const groups = formGroups(members, groupSize)
+    let groups = formGroups(members, groupSize)
+
+    // (Saving groups moved to after Spotify sync and DB-based rebuild)
+
+    // Optionally sync Spotify audio features for imported tracks (auto-run when credentials present)
+    try {
+      if (process.env.SPOTIFY_CLIENT_ID && process.env.SPOTIFY_CLIENT_SECRET && touchedSubmissions.length > 0) {
+        const unique = new Map<string, { trackId?: string | null; rows: number[]; song: string; artist: string }>()
+        for (let i = 0; i < touchedSubmissions.length; i++) {
+          const t = touchedSubmissions[i]
+          const key = `${t.song.trim().toLowerCase()}|${t.artist.trim().toLowerCase()}`
+          if (!unique.has(key)) unique.set(key, { rows: [], song: t.song, artist: t.artist })
+          unique.get(key)!.rows.push(i)
+        }
+        // Search IDs (sequential to respect rate limits)
+        for (const item of unique.values()) {
+          item.trackId = await searchTrackId(item.song, item.artist)
+        }
+        const ids = Array.from(unique.values()).map(u => u.trackId).filter(Boolean) as string[]
+        const featureMap = await fetchAudioFeaturesBatch(ids)
+        // Update rows
+        for (const item of unique.values()) {
+          const id = item.trackId
+          if (!id) continue
+          const f = featureMap[id]
+          if (!f) continue
+          for (const rowIdx of item.rows) {
+            const s = touchedSubmissions[rowIdx]
+            await prisma.musicSubmission.update({
+              where: { id: s.id },
+              data: {
+                energy: f.energy,
+                valence: f.valence,
+                danceability: f.danceability,
+                tempo: f.tempo,
+              }
+            })
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('Spotify sync after import failed (continuing):', e)
+    }
+
+    // Rebuild members from DB and reform groups after Spotify sync
+    try {
+      const usersWithMusic = await prisma.user.findMany({
+        where: { id: { in: Array.from(processedUserIds) } },
+        include: { submissions: true }
+      })
+      if (usersWithMusic.length > 0) {
+        members = buildMembersFromUsers(usersWithMusic)
+        calcCompat(members)
+        // recompute groups
+        groups = formGroups(members, groupSize)
+      }
+    } catch (e) {
+      console.warn('DB-based grouping failed (using initial CSV-derived groups):', e)
+    }
 
     // Replace existing groups if requested
     if (replace) {
@@ -980,7 +1044,12 @@ export async function POST(request: Request) {
         data: {
           userId: session.user.id,
           name: group.name,
-          members: JSON.stringify(group.members),
+          members: JSON.stringify(group.members.map(m => ({
+            userId: (m as any).userId ?? m.id,
+            name: m.name,
+            major: m.major,
+            musicProfile: { topGenres: m.musicProfile.topGenres, listeningStyle: m.musicProfile.listeningStyle }
+          }))),
           compatibility: group.groupCompatibility,
           commonGenres: JSON.stringify(group.commonGenres),
           recommendations: JSON.stringify(group.recommendations)
