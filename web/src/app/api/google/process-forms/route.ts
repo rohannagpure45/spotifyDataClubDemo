@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import { calculateCompatibilities as calcCompat, formOptimizedGroups as formGroups, generateCSV as genCSV } from '@/lib/music-utils'
+import { buildMembersFromUsers } from '@/lib/music-utils'
 import { searchTrackId, fetchAudioFeaturesBatch } from '@/lib/spotify'
 import * as XLSX from 'xlsx'
 
@@ -883,10 +883,10 @@ export async function POST(request: Request) {
     }
 
     // Process the responses
-    const members = processFormResponses(responses)
+    let members = processFormResponses(responses)
 
-    // Calculate compatibilities (shared util)
-    calcCompat(members)
+    // Calculate compatibilities
+    calculateCompatibilities(members)
 
     // Create users for all email addresses in responses and store form data
     const touchedSubmissions: Array<{ id: string; userId: string; song: string; artist: string }> = []
@@ -946,12 +946,12 @@ export async function POST(request: Request) {
             touchedSubmissions.push({ id: existingSubmission.id, userId: user.id, song: existingSubmission.songName, artist: existingSubmission.artistName })
           }
         }
-      } catch (e) {
-        // Fallback: if user creation fails due to bad email, retry with generated placeholder
-        const fallbackEmail = `autogen${Date.now()}_${i}@example.local`
-        const user = await ensureUserExists(
-          fallbackEmail,
-          getStr(response, 'name') || `User ${i + 1}`,
+    } catch {
+      // Fallback: if user creation fails due to bad email, retry with generated placeholder
+      const fallbackEmail = `autogen${Date.now()}_${i}@example.local`
+      const user = await ensureUserExists(
+        fallbackEmail,
+        getStr(response, 'name') || `User ${i + 1}`,
           getStr(response, 'major') || 'Undeclared',
           getStr(response, 'year') || 'Unknown'
         )
@@ -968,8 +968,8 @@ export async function POST(request: Request) {
       }
     }
 
-    // Form optimized groups (shared util)
-    let groups = formGroups(members, groupSize)
+    // Form optimized groups
+    let groups = formOptimizedGroups(members, groupSize)
 
     // (Saving groups moved to after Spotify sync and DB-based rebuild)
 
@@ -1021,73 +1021,15 @@ export async function POST(request: Request) {
       })
       if (usersWithMusic.length > 0) {
         members = buildMembersFromUsers(usersWithMusic)
-        calcCompat(members)
+        calculateCompatibilities(members)
         // recompute groups
-        groups = formGroups(members, groupSize)
+        groups = formOptimizedGroups(members, groupSize)
       }
     } catch (e) {
       console.warn('DB-based grouping failed (using initial CSV-derived groups):', e)
     }
 
-    // Replace existing groups if requested
-    if (replace) {
-      if (replaceScope === 'all') {
-        await prisma.group.deleteMany({})
-      } else {
-        await prisma.group.deleteMany({ where: { userId: session.user.id } })
-      }
-    }
-
-    // Save groups to database for the current user
-    for (const group of groups) {
-      await prisma.group.create({
-        data: {
-          userId: session.user.id,
-          name: group.name,
-          members: JSON.stringify(group.members.map(m => ({
-            userId: (m as any).userId ?? m.id,
-            name: m.name,
-            major: m.major,
-            musicProfile: { topGenres: m.musicProfile.topGenres, listeningStyle: m.musicProfile.listeningStyle }
-          }))),
-          compatibility: group.groupCompatibility,
-          commonGenres: JSON.stringify(group.commonGenres),
-          recommendations: JSON.stringify(group.recommendations)
-        }
-      })
-    }
-
-    // Generate CSV
-    const csvContent = genCSV(groups)
-
-    // Create summary statistics
-    const summary = {
-      totalResponses: responses.length,
-      totalGroups: groups.length,
-      averageGroupSize: responses.length / groups.length,
-      averageCompatibility: groups.reduce((sum, g) => sum + g.groupCompatibility, 0) / groups.length,
-      topGenres: Array.from(
-        groups.reduce((genres, g) => {
-          g.commonGenres.forEach(genre => genres.add(genre))
-          return genres
-        }, new Set<string>())
-      ).slice(0, 10),
-      timestamp: new Date().toISOString()
-    }
-
-    return NextResponse.json({
-      success: true,
-      groups: groups.map(g => ({
-        ...g,
-        members: g.members.map(m => ({
-          ...m,
-          compatibility: Array.from(m.compatibility.entries())
-        }))
-      })),
-      summary,
-      csvContent,
-      message: `Successfully processed ${responses.length} responses into ${groups.length} optimized groups`
-    })
+    // (Moved saving + response after Spotify sync and DB-based rebuild)
 
   } catch (error) {
     console.error('Error processing forms:', error)
@@ -1118,7 +1060,7 @@ export async function GET(request: Request) {
 
   try {
     const groups = JSON.parse(decodeURIComponent(groupData))
-    const csvContent = genCSV(groups)
+    const csvContent = generateCSV(groups)
 
     return new Response(csvContent, {
       headers: {
